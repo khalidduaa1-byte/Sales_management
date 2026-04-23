@@ -3,6 +3,9 @@ sales_data.xlsx
 *.xlsx
 report.html
 
+# Import scripts may contain secrets
+import_historical.py
+
 # Python
 __pycache__/
 *.pyc
