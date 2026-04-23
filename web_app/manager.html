@@ -6,6 +6,7 @@
 <title>Manager Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -291,17 +292,20 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <div id="chart-ba" style="height:300px"></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Sales by Shift</div>
-      <div id="chart-shift" style="height:300px"></div>
+      <div class="chart-title">Avg Sales / Working Day by BA</div>
+      <div id="chart-spd" style="height:300px"></div>
     </div>
   </div>
 
   <!-- Table section -->
   <div class="tbl-header">
     <div class="sec-lbl" style="margin:0">BA Performance — All Entries</div>
-    <div class="view-toggle">
-      <button class="btn-view active" id="btn-tbl"  onclick="setView('table')">Table</button>
-      <button class="btn-view"        id="btn-hmap" onclick="setView('heatmap')">Heatmap</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-reset" onclick="exportToExcel()">↓ Export Excel</button>
+      <div class="view-toggle">
+        <button class="btn-view active" id="btn-tbl"  onclick="setView('table')">Table</button>
+        <button class="btn-view"        id="btn-hmap" onclick="setView('heatmap')">Heatmap</button>
+      </div>
     </div>
   </div>
 
@@ -311,10 +315,6 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <select class="f-sel" id="f-team"  onchange="applyFilters()">
         <option value="">All Teams</option>
         <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
-      </select>
-      <select class="f-sel" id="f-shift" onchange="applyFilters()">
-        <option value="">All Shifts</option>
-        <option>Morning</option><option>Afternoon</option><option>Evening</option>
       </select>
       <select class="f-sel" id="f-month" onchange="applyFilters()"></select>
       <select class="f-sel" id="f-ba"    onchange="applyFilters()">
@@ -335,8 +335,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
           <th onclick="sortBy('team')">Team <span id="arr-team">↕</span></th>
           <th onclick="sortBy('store')">Store <span id="arr-store">↕</span></th>
           <th onclick="sortBy('sales_amount')" class="sorted">Sales <span id="arr-sales_amount">↓</span></th>
-          <th onclick="sortBy('items_sold')">PCs <span id="arr-items_sold">↕</span></th>
-          <th>Shift</th>
+          <th onclick="sortBy('items_sold')">Qty <span id="arr-items_sold">↕</span></th>
+          <th onclick="sortBy('spd')">$/Day <span id="arr-spd">↕</span></th>
           <th onclick="sortBy('entry_date')">Date <span id="arr-entry_date">↕</span></th>
         </tr></thead>
         <tbody id="tbl-body">
@@ -425,7 +425,11 @@ function buildMonthFilter() {
 async function loadAll() {
   const { data, error } = await sb.from('sales_entries').select('*').order('entry_date', { ascending: false });
   if (error) { console.error(error); return; }
-  allEntries = data || [];
+  allEntries = (data || []).map(e => ({
+    ...e,
+    working_days: e.working_days || 1,
+    spd: +e.sales_amount / (e.working_days || 1),
+  }));
 
   // Populate BA filter
   const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
@@ -440,14 +444,12 @@ async function loadAll() {
 // ── Filters ──────────────────────────────────────────────────────
 function filtered() {
   const team  = document.getElementById('f-team').value;
-  const shift = document.getElementById('f-shift').value;
   const month = document.getElementById('f-month').value;
   const ba    = document.getElementById('f-ba').value;
   const start = document.getElementById('f-start').value;
   const end   = document.getElementById('f-end').value;
   return allEntries.filter(e => {
     if (team  && e.team    !== team)   return false;
-    if (shift && e.shift   !== shift)  return false;
     if (ba    && e.ba_name !== ba)     return false;
     if (month && e.entry_date.slice(0,7) !== month) return false;
     if (start && e.entry_date < start) return false;
@@ -466,7 +468,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['f-team','f-shift','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
+  ['f-team','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
   buildMonthFilter();
   applyFilters();
 }
@@ -563,21 +565,29 @@ function renderCharts(entries) {
     bargap:0.35,
   }, { responsive:true, displayModeBar:false });
 
-  // Donut: by shift
-  const byS = {};
-  entries.forEach(e => { byS[e.shift] = (byS[e.shift]||0) + +e.sales_amount; });
-  const sColors = { Morning:'#f59e0b', Afternoon:'#3b82f6', Evening:'#7c3aed' };
-  Plotly.react('chart-shift', [{ type:'pie',
-    labels:Object.keys(byS), values:Object.values(byS),
-    marker:{colors:Object.keys(byS).map(s=>sColors[s]||'#94a3b8')},
-    hole:0.45, textinfo:'label+percent', textfont:{size:12},
-    hovertemplate:'<b>%{label}</b><br>$%{value:,.0f}<extra></extra>' }], {
-    paper_bgcolor:'transparent',
-    margin:{t:10,b:20,l:20,r:20},
-    legend:{font:{size:12,color:'#374151'}},
-    font:{family:'-apple-system,sans-serif'},
-    showlegend:true,
-  }, { responsive:true, displayModeBar:false });
+  // Bar: $/Day by BA
+  const salesByBA = {}, workByBA = {};
+  entries.forEach(e => {
+    salesByBA[e.ba_name] = (salesByBA[e.ba_name] || 0) + +e.sales_amount;
+    workByBA[e.ba_name]  = (workByBA[e.ba_name]  || 0) + (e.working_days || 1);
+  });
+  const spdSorted = Object.keys(salesByBA)
+    .map(n => [n, salesByBA[n] / workByBA[n]])
+    .sort((a,b) => b[1]-a[1]).slice(0,14);
+  const spdColors = spdSorted.map((_,i) => `rgba(124,58,237,${Math.max(0.3,1-i*0.055)})`);
+  if (spdColors.length) spdColors[0] = '#7c3aed';
+  Plotly.react('chart-spd', [{
+    type:'bar', x:spdSorted.map(([n])=>n), y:spdSorted.map(([,v])=>v),
+    marker:{color:spdColors, line:{width:0}},
+    hovertemplate:'<b>%{x}</b><br>$%{y:,.0f}/day<extra></extra>'
+  }], {
+    paper_bgcolor:'transparent', plot_bgcolor:'#fafafa',
+    margin:{t:10,b:80,l:50,r:10},
+    xaxis:{tickangle:-40, tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', linecolor:'#e5e7eb'},
+    yaxis:{tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', tickprefix:'$'},
+    font:{family:'-apple-system,sans-serif', color:'#374151'},
+    bargap:0.35,
+  }, {responsive:true, displayModeBar:false});
 }
 
 // ── Table ────────────────────────────────────────────────────────
@@ -612,14 +622,13 @@ function renderTable(entries) {
     const a = +e.sales_amount;
     const rc = (a === hi && amounts.filter(x=>x===hi).length===1) ? 'row-top'
              : (a === lo && amounts.filter(x=>x===lo).length===1) ? 'row-low' : '';
-    const sp = e.shift==='Morning'?'sM':e.shift==='Afternoon'?'sA':'sE';
     return `<tr class="${rc}">
       <td class="cell-name"><span class="team-dot t${e.team}"></span>${e.ba_name}</td>
       <td>${e.team}</td>
       <td>${e.store||'—'}</td>
       <td class="cell-amount">$${fmt(a)}</td>
       <td>${e.items_sold}</td>
-      <td><span class="shift-pill ${sp}">${e.shift}</span></td>
+      <td class="cell-amount">$${fmt(e.spd)}</td>
       <td>${fmtDate(e.entry_date)}</td>
     </tr>`;
   }).join('');
@@ -676,6 +685,29 @@ function startAutoRefresh() {
     document.getElementById('live-text').textContent = `Live updates • Last updated ${t}`;
   }, 5000);
   setInterval(loadAll, 60000);
+}
+
+// ── Export to Excel ──────────────────────────────────────────────
+function exportToExcel() {
+  const entries = filtered();
+  if (!entries.length) { alert('No data to export.'); return; }
+  const rows = [...entries]
+    .sort((a,b) => a.entry_date < b.entry_date ? 1 : -1)
+    .map(e => ({
+      'BA Name':      e.ba_name,
+      'Team':         e.team,
+      'Store':        e.store || '',
+      'Date':         e.entry_date,
+      'Sales ($)':    +e.sales_amount,
+      'Qty Sold':     e.items_sold,
+      'Working Days': e.working_days,
+      '$/Day':        Math.round(e.spd),
+    }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sales Data');
+  const month = document.getElementById('f-month').value;
+  XLSX.writeFile(wb, `BA_Sales${month ? '_' + month : ''}.xlsx`);
 }
 
 // ── Sign out ─────────────────────────────────────────────────────

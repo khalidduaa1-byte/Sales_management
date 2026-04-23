@@ -258,7 +258,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     </div>
     <div class="stat">
       <div class="stat-val" id="stat-shifts">—</div>
-      <div class="stat-lbl">Shifts</div>
+      <div class="stat-lbl">Days Logged</div>
     </div>
   </div>
 
@@ -267,25 +267,12 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 
   <!-- Submit form -->
   <div class="form-card">
-    <h3>Log a Shift 📋</h3>
+    <h3>Log a Sale 📋</h3>
 
     <label>Date</label>
     <div class="date-row">
       <input type="date" id="entry-date"/>
       <button class="today-btn" onclick="setToday()">Today</button>
-    </div>
-
-    <label>Shift</label>
-    <div class="shift-grid">
-      <div class="shift-btn" id="shift-Morning" onclick="selectShift('Morning')">
-        <span class="icon">🌅</span><span class="label">Morning</span>
-      </div>
-      <div class="shift-btn selected" id="shift-Afternoon" onclick="selectShift('Afternoon')">
-        <span class="icon">☀️</span><span class="label">Afternoon</span>
-      </div>
-      <div class="shift-btn" id="shift-Evening" onclick="selectShift('Evening')">
-        <span class="icon">🌙</span><span class="label">Evening</span>
-      </div>
     </div>
 
     <label>Sales Amount ($)</label>
@@ -294,7 +281,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <label>Items / PCs Sold</label>
     <input type="number" id="items-sold" placeholder="0" min="0" step="1"/>
 
-    <button class="submit-btn" id="submit-btn" onclick="submitSale()">Submit Shift ✓</button>
+    <button class="submit-btn" id="submit-btn" onclick="submitSale()">Log Entry ✓</button>
   </div>
 
   <!-- History -->
@@ -314,7 +301,6 @@ const sb = createClient(
 
 let currentUser = null;
 let currentProfile = null;
-let selectedShift = 'Afternoon';
 
 // ── On page load ──────────────────────────────────────────────────
 // getSession checks if the user is logged in (Supabase stores a token in the browser)
@@ -355,13 +341,6 @@ function setToday() {
   document.getElementById('entry-date').value = new Date().toISOString().slice(0, 10);
 }
 
-function selectShift(shift) {
-  selectedShift = shift;
-  ['Morning', 'Afternoon', 'Evening'].forEach(s => {
-    document.getElementById('shift-' + s).classList.toggle('selected', s === shift);
-  });
-}
-
 // ── Submit a sale ─────────────────────────────────────────────────
 async function submitSale() {
   const amount = parseFloat(document.getElementById('sales-amount').value);
@@ -382,19 +361,20 @@ async function submitSale() {
     ba_name:      currentProfile.name,
     team:         currentProfile.team,
     store:        currentProfile.store,
-    shift:        selectedShift,
+    shift:        'Morning',
     sales_amount: amount,
     items_sold:   items,
+    working_days: 1,
     entry_date:   date,
   });
 
   btn.disabled = false;
-  btn.textContent = 'Submit Shift ✓';
+  btn.textContent = 'Log Entry ✓';
 
   if (error) {
     showMsg('Error saving: ' + error.message, 'error');
   } else {
-    showMsg('Shift logged successfully! 🎉', 'success');
+    showMsg('Entry logged successfully!', 'success');
     document.getElementById('sales-amount').value = '';
     document.getElementById('items-sold').value   = '';
     setToday();
@@ -423,7 +403,6 @@ async function loadHistory() {
     <div class="entry-row">
       <div class="entry-left">
         <div class="entry-date">${formatDate(e.entry_date)}</div>
-        <span class="shift-tag shift-${e.shift}">${e.shift}</span>
       </div>
       <div class="entry-right">
         <div class="entry-amount">$${Number(e.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
