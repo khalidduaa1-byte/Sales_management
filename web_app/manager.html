@@ -292,7 +292,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <div id="chart-ba" style="height:300px"></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Avg Sales / Working Day by BA</div>
+      <div class="chart-title">Avg Qty / Working Day by BA</div>
       <div id="chart-spd" style="height:300px"></div>
     </div>
   </div>
@@ -336,7 +336,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
           <th onclick="sortBy('store')">Store <span id="arr-store">↕</span></th>
           <th onclick="sortBy('sales_amount')" class="sorted">Sales <span id="arr-sales_amount">↓</span></th>
           <th onclick="sortBy('items_sold')">Qty <span id="arr-items_sold">↕</span></th>
-          <th onclick="sortBy('spd')">$/Day <span id="arr-spd">↕</span></th>
+          <th onclick="sortBy('qpd')">Qty/Day <span id="arr-qpd">↕</span></th>
           <th onclick="sortBy('entry_date')">Date <span id="arr-entry_date">↕</span></th>
         </tr></thead>
         <tbody id="tbl-body">
@@ -428,7 +428,7 @@ async function loadAll() {
   allEntries = (data || []).map(e => ({
     ...e,
     working_days: e.working_days || 1,
-    spd: +e.sales_amount / (e.working_days || 1),
+    qpd: e.items_sold / (e.working_days || 1),
   }));
 
   // Populate BA filter
@@ -565,26 +565,26 @@ function renderCharts(entries) {
     bargap:0.35,
   }, { responsive:true, displayModeBar:false });
 
-  // Bar: $/Day by BA
-  const salesByBA = {}, workByBA = {};
+  // Bar: Qty/Day by BA
+  const qtyByBA = {}, workByBA = {};
   entries.forEach(e => {
-    salesByBA[e.ba_name] = (salesByBA[e.ba_name] || 0) + +e.sales_amount;
-    workByBA[e.ba_name]  = (workByBA[e.ba_name]  || 0) + (e.working_days || 1);
+    qtyByBA[e.ba_name]  = (qtyByBA[e.ba_name]  || 0) + e.items_sold;
+    workByBA[e.ba_name] = (workByBA[e.ba_name]  || 0) + (e.working_days || 1);
   });
-  const spdSorted = Object.keys(salesByBA)
-    .map(n => [n, salesByBA[n] / workByBA[n]])
+  const spdSorted = Object.keys(qtyByBA)
+    .map(n => [n, qtyByBA[n] / workByBA[n]])
     .sort((a,b) => b[1]-a[1]).slice(0,14);
   const spdColors = spdSorted.map((_,i) => `rgba(124,58,237,${Math.max(0.3,1-i*0.055)})`);
   if (spdColors.length) spdColors[0] = '#7c3aed';
   Plotly.react('chart-spd', [{
     type:'bar', x:spdSorted.map(([n])=>n), y:spdSorted.map(([,v])=>v),
     marker:{color:spdColors, line:{width:0}},
-    hovertemplate:'<b>%{x}</b><br>$%{y:,.0f}/day<extra></extra>'
+    hovertemplate:'<b>%{x}</b><br>%{y:.1f} pcs/day<extra></extra>'
   }], {
     paper_bgcolor:'transparent', plot_bgcolor:'#fafafa',
     margin:{t:10,b:80,l:50,r:10},
     xaxis:{tickangle:-40, tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', linecolor:'#e5e7eb'},
-    yaxis:{tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', tickprefix:'$'},
+    yaxis:{tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6'},
     font:{family:'-apple-system,sans-serif', color:'#374151'},
     bargap:0.35,
   }, {responsive:true, displayModeBar:false});
@@ -628,7 +628,7 @@ function renderTable(entries) {
       <td>${e.store||'—'}</td>
       <td class="cell-amount">$${fmt(a)}</td>
       <td>${e.items_sold}</td>
-      <td class="cell-amount">$${fmt(e.spd)}</td>
+      <td>${(e.qpd||0).toFixed(1)}</td>
       <td>${fmtDate(e.entry_date)}</td>
     </tr>`;
   }).join('');
@@ -701,7 +701,7 @@ function exportToExcel() {
       'Sales ($)':    +e.sales_amount,
       'Qty Sold':     e.items_sold,
       'Working Days': e.working_days,
-      '$/Day':        Math.round(e.spd),
+      'Qty/Day':      +(e.qpd||0).toFixed(1),
     }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
