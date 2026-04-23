@@ -1,0 +1,9 @@
+# Data files — keep private, never push to GitHub
+sales_data.xlsx
+*.xlsx
+report.html
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
