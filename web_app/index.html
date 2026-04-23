@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>BA Sales App</title>
+
+<!--
+  What is this file?
+  The login page. Any user (BA or manager) opens this URL.
+  When they log in, this page checks their "role" in the database
+  and redirects them to either ba.html or manager.html automatically.
+
+  What is Supabase JS?
+  A library that lets our HTML page talk to the Supabase database
+  without needing a server in between.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --text: #1e293b;
+  --muted: #64748b;
+  --red: #dc2626;
+  --green: #16a34a;
+  --radius: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+.logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.logo-icon {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 14px;
+}
+.logo h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+.logo p  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+.tab {
+  padding: 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 7px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: .15s;
+}
+.tab.active { background: var(--accent); color: #fff; }
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+input, select {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 14px;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 16px;
+  outline: none;
+  transition: .15s;
+  -webkit-appearance: none;
+}
+input:focus, select:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+input::placeholder { color: #94a3b8; }
+
+.btn {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: .15s;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.msg {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: none;
+}
+.msg.error   { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
+
+/* Register-only fields */
+#register-fields { display: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">💎</div>
+    <h1>BA Sales</h1>
+    <p>Egypt Team Performance</p>
+  </div>
+
+  <!-- Login / Register tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tab-login"    onclick="switchTab('login')">Sign In</button>
+    <button class="tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+  </div>
+
+  <form id="auth-form" onsubmit="handleSubmit(event)">
+
+    <!-- Register-only fields -->
+    <div id="register-fields">
+      <label>Your Full Name</label>
+      <input type="text" id="name" placeholder="e.g. Samah Ali"/>
+
+      <label>Role</label>
+      <select id="role" onchange="toggleTeamField()">
+        <option value="ba">Brand Ambassador (BA)</option>
+        <option value="manager">Retail Manager</option>
+      </select>
+
+      <div id="team-store-fields">
+        <label>Team</label>
+        <select id="team">
+          <option value="Cairo">Cairo</option>
+          <option value="Sharm">Sharm</option>
+          <option value="Hurgadah">Hurgadah</option>
+        </select>
+
+        <label>Store / Location</label>
+        <input type="text" id="store" placeholder="e.g. City Stars"/>
+      </div>
+    </div>
+
+    <label>Email</label>
+    <input type="email" id="email" placeholder="you@email.com" required/>
+
+    <label>Password</label>
+    <input type="password" id="password" placeholder="••••••••" required minlength="6"/>
+
+    <button class="btn" type="submit" id="submit-btn">Sign In</button>
+  </form>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+// ── Supabase setup ────────────────────────────────────────────────
+// supabase.createClient connects our page to the database.
+// The URL and key tell it WHICH database to talk to.
+// The anon key is safe to expose in frontend code — it has limited permissions.
+const { createClient } = supabase;
+const sb = createClient(
+  'https://tnxkstouapfcjoboymnf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+);
+
+// ── Show error from redirect if setup.sql wasn't run ─────────────
+const urlError = new URLSearchParams(window.location.search).get('error');
+if (urlError === 'setup') {
+  const m = document.getElementById('msg');
+  m.textContent = 'Your account was created but the database tables are missing. Ask the admin to run setup.sql in Supabase first.';
+  m.className = 'msg error';
+  m.style.display = 'block';
+}
+
+// ── If already logged in, redirect straight away ──────────────────
+// So BAs don't have to log in every time they open the app
+(async () => {
+  if (urlError) return; // don't redirect if we just got bounced back with an error
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await redirectByRole(session.user.id);
+})();
+
+// ── Tab switching ─────────────────────────────────────────────────
+let mode = 'login';
+function switchTab(m) {
+  mode = m;
+  document.getElementById('tab-login').classList.toggle('active', m === 'login');
+  document.getElementById('tab-register').classList.toggle('active', m === 'register');
+  document.getElementById('register-fields').style.display = m === 'register' ? 'block' : 'none';
+  document.getElementById('submit-btn').textContent = m === 'login' ? 'Sign In' : 'Create Account';
+  clearMsg();
+}
+
+function toggleTeamField() {
+  const isBA = document.getElementById('role').value === 'ba';
+  document.getElementById('team-store-fields').style.display = isBA ? 'block' : 'none';
+}
+
+// ── Form submit ───────────────────────────────────────────────────
+async function handleSubmit(e) {
+  e.preventDefault();  // Stop the page from refreshing (default form behaviour)
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Please wait…';
+  clearMsg();
+
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    if (mode === 'login') {
+      // signInWithPassword checks email + password against Supabase auth
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await redirectByRole(data.user.id);
+
+    } else {
+      const name  = document.getElementById('name').value.trim();
+      const role  = document.getElementById('role').value;
+      const team  = role === 'ba' ? document.getElementById('team').value : null;
+      const store = role === 'ba' ? document.getElementById('store').value.trim() : null;
+
+      if (!name) throw new Error('Please enter your name.');
+
+      // signUp creates the account. The metadata (name, role, team, store)
+      // gets passed to our trigger function in the database to create the profile row.
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { name, role, team, store } }
+      });
+      if (error) throw error;
+
+      showMsg('Account created! Check your email to confirm, then sign in.', 'success');
+    }
+  } catch (err) {
+    showMsg(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+  }
+}
+
+// ── Redirect based on role ────────────────────────────────────────
+async function redirectByRole(userId) {
+  // Look up their profile to find out if they're a manager or BA
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (profile?.role === 'manager') {
+    window.location.href = 'manager.html';
+  } else {
+    window.location.href = 'ba.html';
+  }
+}
+
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+}
+function clearMsg() {
+  document.getElementById('msg').style.display = 'none';
+}
+</script>
+</body>
+</html>

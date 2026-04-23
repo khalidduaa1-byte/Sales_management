@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>My Sales</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --card2: #f8fafc;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --green: #16a34a;
+  --orange: #d97706;
+  --red: #dc2626;
+  --text: #1e293b;
+  --muted: #64748b;
+  --radius: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+
+/* ── Top bar ── */
+.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.topbar-left h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+.topbar-left p  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.signout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.signout-btn:hover { background: #f1f5f9; }
+
+.container { padding: 20px 16px; max-width: 480px; margin: 0 auto; }
+
+/* ── Stats row ── */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.stat-val { font-size: 20px; font-weight: 800; color: var(--text); }
+.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+/* ── Form card ── */
+.form-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.form-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+input, select {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 14px;
+  outline: none;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+input[type="number"] { font-size: 22px; font-weight: 700; }
+
+/* Shift selector */
+.shift-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.shift-btn {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: .15s;
+}
+.shift-btn .icon  { font-size: 20px; display: block; margin-bottom: 4px; }
+.shift-btn .label { font-size: 11px; font-weight: 600; color: var(--muted); }
+.shift-btn.selected {
+  border-color: var(--accent);
+  background: #eff6ff;
+}
+.shift-btn.selected .label { color: var(--accent); }
+
+/* Date row */
+.date-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.date-row input { margin-bottom: 0; flex: 1; }
+.today-btn {
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 14px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.today-btn:hover { background: #e2e8f0; }
+
+.submit-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: .15s;
+}
+.submit-btn:hover   { background: var(--accent-hover); }
+.submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.msg {
+  padding: 13px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  display: none;
+}
+.msg.error   { background: #fef2f2; color: var(--red);   border: 1px solid #fecaca; }
+.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
+
+/* ── History ── */
+.history-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.history-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.entry-row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.entry-row:last-child { border-bottom: none; }
+.entry-row:hover { background: #f8fafc; }
+.entry-left {}
+.entry-date  { font-size: 12px; color: var(--muted); }
+.entry-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.entry-right { text-align: right; }
+.entry-amount { font-size: 18px; font-weight: 800; color: var(--text); }
+.entry-items  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.shift-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.shift-Morning   { background: #fef3c7; color: var(--orange); }
+.shift-Afternoon { background: #eff6ff; color: var(--accent); }
+.shift-Evening   { background: #f5f3ff; color: #7c3aed; }
+.empty-state { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <h2 id="ba-name">Loading…</h2>
+    <p id="ba-meta"></p>
+  </div>
+  <button class="signout-btn" onclick="signOut()">Sign out</button>
+</div>
+
+<div class="container">
+
+  <!-- Stats summary -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-month-sales">—</div>
+      <div class="stat-lbl">This Month $</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-month-items">—</div>
+      <div class="stat-lbl">PCs Sold</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-shifts">—</div>
+      <div class="stat-lbl">Shifts</div>
+    </div>
+  </div>
+
+  <!-- Message -->
+  <div class="msg" id="msg"></div>
+
+  <!-- Submit form -->
+  <div class="form-card">
+    <h3>Log a Shift 📋</h3>
+
+    <label>Date</label>
+    <div class="date-row">
+      <input type="date" id="entry-date"/>
+      <button class="today-btn" onclick="setToday()">Today</button>
+    </div>
+
+    <label>Shift</label>
+    <div class="shift-grid">
+      <div class="shift-btn" id="shift-Morning" onclick="selectShift('Morning')">
+        <span class="icon">🌅</span><span class="label">Morning</span>
+      </div>
+      <div class="shift-btn selected" id="shift-Afternoon" onclick="selectShift('Afternoon')">
+        <span class="icon">☀️</span><span class="label">Afternoon</span>
+      </div>
+      <div class="shift-btn" id="shift-Evening" onclick="selectShift('Evening')">
+        <span class="icon">🌙</span><span class="label">Evening</span>
+      </div>
+    </div>
+
+    <label>Sales Amount ($)</label>
+    <input type="number" id="sales-amount" placeholder="0" min="0" step="0.01"/>
+
+    <label>Items / PCs Sold</label>
+    <input type="number" id="items-sold" placeholder="0" min="0" step="1"/>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitSale()">Submit Shift ✓</button>
+  </div>
+
+  <!-- History -->
+  <div class="history-card">
+    <h3>My Submissions</h3>
+    <div id="history-list"><div class="empty-state">Loading…</div></div>
+  </div>
+
+</div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(
+  'https://tnxkstouapfcjoboymnf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+);
+
+let currentUser = null;
+let currentProfile = null;
+let selectedShift = 'Afternoon';
+
+// ── On page load ──────────────────────────────────────────────────
+// getSession checks if the user is logged in (Supabase stores a token in the browser)
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  currentUser = session.user;
+
+  // Fetch their profile from our profiles table
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser.id)
+    .single();
+
+  if (!profile || profile.role !== 'ba') {
+    if (profile && profile.role === 'manager') { window.location.href = 'manager.html'; return; }
+    await sb.auth.signOut();
+    window.location.href = 'index.html?error=setup';
+    return;
+  }
+
+  currentProfile = profile;
+
+  // Update the header
+  document.getElementById('ba-name').textContent = profile.name;
+  document.getElementById('ba-meta').textContent = `${profile.team} · ${profile.store}`;
+
+  setToday();
+  await loadHistory();
+  updateStats();
+})();
+
+// ── Helpers ───────────────────────────────────────────────────────
+function setToday() {
+  // toISOString gives us "2026-04-23T..." — we take the first 10 chars for the date
+  document.getElementById('entry-date').value = new Date().toISOString().slice(0, 10);
+}
+
+function selectShift(shift) {
+  selectedShift = shift;
+  ['Morning', 'Afternoon', 'Evening'].forEach(s => {
+    document.getElementById('shift-' + s).classList.toggle('selected', s === shift);
+  });
+}
+
+// ── Submit a sale ─────────────────────────────────────────────────
+async function submitSale() {
+  const amount = parseFloat(document.getElementById('sales-amount').value);
+  const items  = parseInt(document.getElementById('items-sold').value);
+  const date   = document.getElementById('entry-date').value;
+
+  if (!date)          return showMsg('Please select a date.', 'error');
+  if (isNaN(amount) || amount <= 0) return showMsg('Enter a valid sales amount.', 'error');
+  if (isNaN(items)  || items  <  0) return showMsg('Enter a valid items count.', 'error');
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  // .insert() adds a new row to the sales_entries table
+  const { error } = await sb.from('sales_entries').insert({
+    ba_id:        currentUser.id,
+    ba_name:      currentProfile.name,
+    team:         currentProfile.team,
+    store:        currentProfile.store,
+    shift:        selectedShift,
+    sales_amount: amount,
+    items_sold:   items,
+    entry_date:   date,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Submit Shift ✓';
+
+  if (error) {
+    showMsg('Error saving: ' + error.message, 'error');
+  } else {
+    showMsg('Shift logged successfully! 🎉', 'success');
+    document.getElementById('sales-amount').value = '';
+    document.getElementById('items-sold').value   = '';
+    setToday();
+    await loadHistory();
+    updateStats();
+  }
+}
+
+// ── Load history ──────────────────────────────────────────────────
+async function loadHistory() {
+  // .select() fetches rows, .eq() filters to this BA only, .order() sorts by date
+  const { data: entries } = await sb
+    .from('sales_entries')
+    .select('*')
+    .eq('ba_id', currentUser.id)
+    .order('entry_date', { ascending: false })
+    .limit(30);
+
+  const list = document.getElementById('history-list');
+  if (!entries || entries.length === 0) {
+    list.innerHTML = '<div class="empty-state">No submissions yet — log your first shift above!</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map(e => `
+    <div class="entry-row">
+      <div class="entry-left">
+        <div class="entry-date">${formatDate(e.entry_date)}</div>
+        <span class="shift-tag shift-${e.shift}">${e.shift}</span>
+      </div>
+      <div class="entry-right">
+        <div class="entry-amount">$${Number(e.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+        <div class="entry-items">${e.items_sold} pcs</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Update stats ──────────────────────────────────────────────────
+async function updateStats() {
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+
+  const { data: entries } = await sb
+    .from('sales_entries')
+    .select('sales_amount, items_sold')
+    .eq('ba_id', currentUser.id)
+    .gte('entry_date', monthStart);  // gte = greater than or equal
+
+  if (!entries) return;
+  const totalSales = entries.reduce((s, e) => s + Number(e.sales_amount), 0);
+  const totalItems = entries.reduce((s, e) => s + e.items_sold, 0);
+
+  document.getElementById('stat-month-sales').textContent = '$' + totalSales.toLocaleString('en-US', {maximumFractionDigits:0});
+  document.getElementById('stat-month-items').textContent = totalItems;
+  document.getElementById('stat-shifts').textContent      = entries.length;
+}
+
+// ── Sign out ──────────────────────────────────────────────────────
+async function signOut() {
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+}
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => el.style.display = 'none', 3000);
+}
+</script>
+</body>
+</html>

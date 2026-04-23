@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Manager Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: #F7F8FA;
+  color: #111827;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── Header ── */
+header {
+  position: sticky; top: 0; z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.header-inner {
+  max-width: 1800px; margin: 0 auto;
+  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+  flex-shrink: 0;
+}
+.brand-icon svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.brand-title { font-size: 17px; font-weight: 700; color: #111827; }
+.live-badge { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #10b981;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(1.35); }
+}
+.live-text { font-size: 11px; color: #6b7280; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.manager-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: #374151;
+}
+.manager-chip svg { width: 15px; height: 15px; stroke: #6b7280; stroke-width: 2; fill: none; }
+.btn-signout {
+  padding: 7px 14px;
+  background: transparent; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-size: 13px; color: #6b7280; cursor: pointer; transition: background .15s;
+}
+.btn-signout:hover { background: #f3f4f6; }
+
+/* ── Main ── */
+main { max-width: 1800px; margin: 0 auto; padding: 24px; }
+
+/* ── Section label ── */
+.sec-lbl {
+  font-size: 11px; font-weight: 700; color: #6b7280;
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+
+/* ── KPI grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 680px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.kpi-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow .18s;
+}
+.kpi-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.kpi-icon-row { margin-bottom: 12px; }
+.kpi-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.kpi-icon svg { width: 17px; height: 17px; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.kpi-icon.blue   { background: #eff6ff; } .kpi-icon.blue   svg { stroke: #2563eb; }
+.kpi-icon.green  { background: #f0fdf4; } .kpi-icon.green  svg { stroke: #059669; }
+.kpi-icon.purple { background: #f5f3ff; } .kpi-icon.purple svg { stroke: #7c3aed; }
+.kpi-icon.orange { background: #fff7ed; } .kpi-icon.orange svg { stroke: #ea580c; }
+.kpi-icon.pink   { background: #fdf2f8; } .kpi-icon.pink   svg { stroke: #db2777; }
+.kpi-icon.indigo { background: #eef2ff; } .kpi-icon.indigo svg { stroke: #4f46e5; }
+.kpi-val { font-size: 22px; font-weight: 800; color: #111827; line-height: 1.1; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-lbl { font-size: 11px; color: #6b7280; }
+
+/* ── Target grid ── */
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.target-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow .18s;
+}
+.target-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.target-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.target-left .target-name { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+.target-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+}
+.on-track  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.behind    { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.target-right { text-align: right; }
+.target-big { font-size: 26px; font-weight: 800; color: #111827; line-height: 1; }
+.target-sub { font-size: 11px; color: #6b7280; margin-top: 3px; }
+.prog-track { height: 8px; background: #f3f4f6; border-radius: 99px; overflow: hidden; margin: 4px 0 14px; }
+.prog-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+.target-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.ts-lbl { font-size: 10px; color: #9ca3af; margin-bottom: 3px; }
+.ts-val { font-size: 13px; font-weight: 700; color: #111827; }
+
+/* ── Charts ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+.chart-card {
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 14px; padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.chart-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 16px; }
+
+/* ── Filter bar ── */
+.filter-card {
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 14px; padding: 16px 20px; margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.f-sel, .f-date {
+  padding: 8px 12px;
+  background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: 13px; color: #374151; outline: none;
+  -webkit-appearance: none; cursor: pointer; min-width: 130px;
+}
+.f-sel:focus, .f-date:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.btn-reset {
+  padding: 8px 16px; background: #fff; border: 1px solid #d1d5db;
+  border-radius: 8px; font-size: 13px; color: #374151; cursor: pointer; transition: background .15s;
+}
+.btn-reset:hover { background: #f9fafb; }
+
+/* ── Table section header ── */
+.tbl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.view-toggle { display: flex; gap: 6px; }
+.btn-view {
+  padding: 7px 16px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; color: #374151; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s;
+}
+.btn-view.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn-view:not(.active):hover { background: #f9fafb; }
+
+/* ── Table ── */
+.table-card {
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 14px; overflow: hidden; margin-bottom: 28px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+th {
+  padding: 11px 18px; text-align: left;
+  font-size: 11px; font-weight: 700; color: #6b7280;
+  text-transform: uppercase; letter-spacing: .06em;
+  white-space: nowrap; cursor: pointer; user-select: none;
+}
+th svg { width: 11px; height: 11px; vertical-align: middle; margin-left: 4px; }
+th.sorted { color: #2563eb; }
+td {
+  padding: 13px 18px; border-bottom: 1px solid #f3f4f6;
+  font-size: 13px; color: #374151; white-space: nowrap;
+}
+tr:last-child td { border-bottom: none; }
+tr.row-top td  { background: #f0fdf4; }
+tr.row-low td  { background: #fef2f2; }
+tr:not(.row-top):not(.row-low):hover td { background: #f9fafb; }
+td.cell-name   { font-weight: 700; color: #111827; }
+td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+.shift-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.sM { background: #fef3c7; color: #b45309; }
+.sA { background: #eff6ff; color: #1d4ed8; }
+.sE { background: #f5f3ff; color: #6d28d9; }
+.team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.tCairo    { background: #059669; }
+.tSharm    { background: #2563eb; }
+.tHurgadah { background: #ea580c; }
+.tbl-footer { padding: 10px 18px; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
+
+/* ── Heatmap ── */
+.hmap-wrap { padding: 20px; overflow-x: auto; }
+.hmap { border-collapse: separate; border-spacing: 4px; }
+.hmap th { font-size: 11px; color: #6b7280; font-weight: 600; text-align: center; min-width: 55px; padding: 4px; }
+.hmap td { text-align: center; border-radius: 6px; font-size: 11px; font-weight: 600; padding: 8px 6px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="5" height="14" rx="1"/><rect x="9.5" y="9" width="5" height="10" rx="1"/><rect x="17" y="13" width="5" height="6" rx="1"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">Manager Dashboard</div>
+        <div class="live-badge">
+          <div class="live-dot"></div>
+          <span class="live-text" id="live-text">Live updates • Last updated just now</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="manager-chip">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span id="manager-name">Manager</span>
+      </div>
+      <button class="btn-signout" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- KPIs -->
+  <div class="sec-lbl">Today's Performance</div>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-val" id="kv0">—</div><div class="kpi-lbl">Today's Sales</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon green"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-val" id="kv1">—</div><div class="kpi-lbl">Monthly Sales</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div><div class="kpi-val" id="kv2">—</div><div class="kpi-lbl">Total PCs Sold</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="kpi-val" id="kv3">—</div><div class="kpi-lbl">Avg PCs / BA</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon pink"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div></div><div class="kpi-val" id="kv4" style="font-size:15px">—</div><div class="kpi-lbl">Top Performer</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div></div><div class="kpi-val" id="kv5">—</div><div class="kpi-lbl">Active Teams</div></div>
+  </div>
+
+  <!-- Team Targets -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div class="sec-lbl" style="margin:0">Monthly Team Targets</div>
+    <span id="days-badge" style="font-size:11px;padding:3px 10px;border-radius:99px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:600"></span>
+  </div>
+  <div class="target-grid" id="target-grid">
+    <div style="color:#9ca3af;padding:20px">Loading…</div>
+  </div>
+
+  <!-- Charts -->
+  <div class="sec-lbl">Performance Analytics</div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">PCs Sold by Beauty Advisor</div>
+      <div id="chart-ba" style="height:300px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sales by Shift</div>
+      <div id="chart-shift" style="height:300px"></div>
+    </div>
+  </div>
+
+  <!-- Table section -->
+  <div class="tbl-header">
+    <div class="sec-lbl" style="margin:0">BA Performance — All Entries</div>
+    <div class="view-toggle">
+      <button class="btn-view active" id="btn-tbl"  onclick="setView('table')">Table</button>
+      <button class="btn-view"        id="btn-hmap" onclick="setView('heatmap')">Heatmap</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-card">
+    <div class="filter-row">
+      <select class="f-sel" id="f-team"  onchange="applyFilters()">
+        <option value="">All Teams</option>
+        <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
+      </select>
+      <select class="f-sel" id="f-shift" onchange="applyFilters()">
+        <option value="">All Shifts</option>
+        <option>Morning</option><option>Afternoon</option><option>Evening</option>
+      </select>
+      <select class="f-sel" id="f-month" onchange="applyFilters()"></select>
+      <select class="f-sel" id="f-ba"    onchange="applyFilters()">
+        <option value="">All BAs</option>
+      </select>
+      <input type="date" class="f-date" id="f-start" onchange="applyFilters()" title="Start date"/>
+      <input type="date" class="f-date" id="f-end"   onchange="applyFilters()" title="End date"/>
+      <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Table view -->
+  <div class="table-card" id="view-table">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="sortBy('ba_name')">BA Name <span id="arr-ba_name">↕</span></th>
+          <th onclick="sortBy('team')">Team <span id="arr-team">↕</span></th>
+          <th onclick="sortBy('store')">Store <span id="arr-store">↕</span></th>
+          <th onclick="sortBy('sales_amount')" class="sorted">Sales <span id="arr-sales_amount">↓</span></th>
+          <th onclick="sortBy('items_sold')">PCs <span id="arr-items_sold">↕</span></th>
+          <th>Shift</th>
+          <th onclick="sortBy('entry_date')">Date <span id="arr-entry_date">↕</span></th>
+        </tr></thead>
+        <tbody id="tbl-body">
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tbl-footer" id="tbl-footer"></div>
+  </div>
+
+  <!-- Heatmap view -->
+  <div class="table-card" id="view-heatmap" style="display:none">
+    <div class="hmap-wrap" id="hmap-body">
+      <p style="color:#9ca3af">Loading…</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(
+  'https://tnxkstouapfcjoboymnf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+);
+
+const TARGETS = {
+  "2026-01": { Cairo: 11000, Sharm: 18000, Hurgadah: 15000 },
+  "2026-02": { Cairo:  9000, Sharm: 13333, Hurgadah: 10000 },
+  "2026-03": { Cairo:  9000, Sharm: 13333, Hurgadah: 10000 },
+  "2026-04": { Cairo:  9500, Sharm: 17000, Hurgadah: 13333 },
+};
+const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
+
+let allEntries = [];
+let sortCol = 'sales_amount', sortAsc = false;
+let viewMode = 'table';
+let lastUpdated = new Date();
+
+// ── Auth ─────────────────────────────────────────────────────────
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const { data: profile, error: pErr } = await sb.from('profiles')
+    .select('name,role').eq('id', session.user.id).single();
+  if (pErr || !profile) { await sb.auth.signOut(); window.location.href = 'index.html?error=setup'; return; }
+  if (profile.role === 'ba')       { window.location.href = 'ba.html'; return; }
+  if (profile.role !== 'manager')  { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+
+  document.getElementById('manager-name').textContent = profile.name || 'Manager';
+  buildMonthFilter();
+  buildDaysBadge();
+  await loadAll();
+  startAutoRefresh();
+})();
+
+// ── Days remaining ───────────────────────────────────────────────
+function buildDaysBadge() {
+  const now = new Date();
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const rem  = last - now.getDate();
+  const el   = document.getElementById('days-badge');
+  if (el) el.textContent = rem + ' day' + (rem !== 1 ? 's' : '') + ' remaining in month';
+}
+
+// ── Month filter ─────────────────────────────────────────────────
+function buildMonthFilter() {
+  const now = new Date();
+  const cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const opts = [
+    { v: '',        l: 'All Months' },
+    { v: '2026-01', l: 'Jan 2026' },
+    { v: '2026-02', l: 'Feb 2026' },
+    { v: '2026-03', l: 'Mar 2026' },
+    { v: '2026-04', l: 'Apr 2026' },
+  ];
+  if (!opts.find(o => o.v === cur) && cur) {
+    opts.push({ v: cur, l: now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) });
+  }
+  const sel = document.getElementById('f-month');
+  sel.innerHTML = opts.map(o => `<option value="${o.v}"${o.v === cur ? ' selected' : ''}>${o.l}</option>`).join('');
+}
+
+// ── Load all entries ─────────────────────────────────────────────
+async function loadAll() {
+  const { data, error } = await sb.from('sales_entries').select('*').order('entry_date', { ascending: false });
+  if (error) { console.error(error); return; }
+  allEntries = data || [];
+
+  // Populate BA filter
+  const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
+  const fba = document.getElementById('f-ba');
+  fba.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
+
+  lastUpdated = new Date();
+  updateLiveBadge();
+  applyFilters();
+}
+
+// ── Filters ──────────────────────────────────────────────────────
+function filtered() {
+  const team  = document.getElementById('f-team').value;
+  const shift = document.getElementById('f-shift').value;
+  const month = document.getElementById('f-month').value;
+  const ba    = document.getElementById('f-ba').value;
+  const start = document.getElementById('f-start').value;
+  const end   = document.getElementById('f-end').value;
+  return allEntries.filter(e => {
+    if (team  && e.team    !== team)   return false;
+    if (shift && e.shift   !== shift)  return false;
+    if (ba    && e.ba_name !== ba)     return false;
+    if (month && e.entry_date.slice(0,7) !== month) return false;
+    if (start && e.entry_date < start) return false;
+    if (end   && e.entry_date > end)   return false;
+    return true;
+  });
+}
+
+function applyFilters() {
+  const e = filtered();
+  renderKPIs(e);
+  renderTargets(e);
+  renderCharts(e);
+  if (viewMode === 'table') renderTable(e);
+  else renderHeatmap(e);
+}
+
+function resetFilters() {
+  ['f-team','f-shift','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
+  buildMonthFilter();
+  applyFilters();
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────
+function renderKPIs(entries) {
+  const today     = new Date().toISOString().slice(0,10);
+  const todaySales = entries.filter(e => e.entry_date === today).reduce((s,e) => s + +e.sales_amount, 0);
+  const mthSales   = entries.reduce((s,e) => s + +e.sales_amount, 0);
+  const totalPcs   = entries.reduce((s,e) => s + e.items_sold, 0);
+  const bas        = new Set(entries.map(e => e.ba_id));
+  const avgPcs     = bas.size ? (totalPcs / bas.size).toFixed(1) : '0';
+  const byBA       = {};
+  entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name]||0) + +e.sales_amount; });
+  const top        = Object.entries(byBA).sort((a,b) => b[1]-a[1])[0];
+  const teams      = new Set(entries.map(e => e.team));
+
+  setText('kv0', '$' + fmt(todaySales));
+  setText('kv1', '$' + fmt(mthSales));
+  setText('kv2', totalPcs.toLocaleString());
+  setText('kv3', avgPcs);
+  setText('kv4', top ? top[0] : '—');
+  setText('kv5', teams.size);
+}
+
+// ── Team targets ─────────────────────────────────────────────────
+function renderTargets(entries) {
+  const month = document.getElementById('f-month').value;
+  const monthTargets = month && TARGETS[month] ? TARGETS[month] : null;
+  const now   = new Date();
+  const last  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const dLeft = last - now.getDate();
+  const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate()-7);
+  const sevenKey = sevenAgo.toISOString().slice(0,10);
+
+  document.getElementById('target-grid').innerHTML = ['Cairo','Sharm','Hurgadah'].map(team => {
+    const te      = entries.filter(e => e.team === team);
+    const sales   = te.reduce((s,e) => s + +e.sales_amount, 0);
+    const pcs     = te.reduce((s,e) => s + e.items_sold, 0);
+    const uniqBAs = new Set(te.map(e => e.ba_id)).size;
+    const tgt     = monthTargets && uniqBAs ? monthTargets[team] * uniqBAs : null;
+    const pct     = tgt ? (sales / tgt) * 100 : 0;
+    const rem     = tgt ? Math.max(0, tgt - sales) : null;
+    const dailyNeed = rem && dLeft > 0 ? rem / dLeft : 0;
+    const avg7    = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + +e.sales_amount, 0) / 7;
+    const onTrack = tgt ? avg7 >= dailyNeed : true;
+
+    const barGrad = pct >= 95 ? 'linear-gradient(90deg,#059669,#10b981)'
+                  : pct >= 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)'
+                  :             'linear-gradient(90deg,#f59e0b,#ef4444)';
+    const c = TEAM_COLORS[team];
+
+    return `<div class="target-card">
+      <div class="target-top">
+        <div class="target-left">
+          <div class="target-name">
+            <span class="target-dot" style="background:${c}"></span>${team}
+          </div>
+          <span class="status-badge ${onTrack ? 'on-track' : 'behind'}">${onTrack ? '✓ On Track' : '↓ Behind Target'}</span>
+        </div>
+        <div class="target-right">
+          <div class="target-big">$${(sales/1000).toFixed(1)}k</div>
+          <div class="target-sub">${tgt ? 'of $'+(tgt/1000).toFixed(0)+'k target' : 'No target set'}</div>
+        </div>
+      </div>
+      <div class="prog-track"><div class="prog-fill" style="width:${Math.min(pct,100).toFixed(1)}%;background:${barGrad}"></div></div>
+      <div class="target-stats">
+        <div><div class="ts-lbl">Remaining</div><div class="ts-val">${rem !== null ? '$'+(rem/1000).toFixed(1)+'k' : '—'}</div></div>
+        <div><div class="ts-lbl">Daily needed</div><div class="ts-val">${dailyNeed > 0 ? '$'+(dailyNeed/1000).toFixed(1)+'k' : '—'}</div></div>
+        <div><div class="ts-lbl">7-day avg/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">$${(avg7/1000).toFixed(1)}k</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Charts ───────────────────────────────────────────────────────
+function renderCharts(entries) {
+  // Bar: PCs by BA
+  const byBA = {};
+  entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name]||0) + e.items_sold; });
+  const sorted = Object.entries(byBA).sort((a,b)=>b[1]-a[1]).slice(0,14);
+  const bN = sorted.map(([n])=>n);
+  const bV = sorted.map(([,v])=>v);
+  const bC = sorted.map((_,i) => `rgba(5,150,105,${Math.max(0.3, 1-i*0.055)})`);
+  if (sorted.length) bC[0] = '#059669';
+
+  Plotly.react('chart-ba', [{ type:'bar', x:bN, y:bV, marker:{ color:bC, line:{width:0} },
+    hovertemplate:'<b>%{x}</b><br>%{y} PCs<extra></extra>' }], {
+    paper_bgcolor:'transparent', plot_bgcolor:'#fafafa',
+    margin:{t:10,b:80,l:40,r:10},
+    xaxis:{ tickangle:-40, tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', linecolor:'#e5e7eb' },
+    yaxis:{ tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6' },
+    font:{ family:'-apple-system,sans-serif', color:'#374151' },
+    bargap:0.35,
+  }, { responsive:true, displayModeBar:false });
+
+  // Donut: by shift
+  const byS = {};
+  entries.forEach(e => { byS[e.shift] = (byS[e.shift]||0) + +e.sales_amount; });
+  const sColors = { Morning:'#f59e0b', Afternoon:'#3b82f6', Evening:'#7c3aed' };
+  Plotly.react('chart-shift', [{ type:'pie',
+    labels:Object.keys(byS), values:Object.values(byS),
+    marker:{colors:Object.keys(byS).map(s=>sColors[s]||'#94a3b8')},
+    hole:0.45, textinfo:'label+percent', textfont:{size:12},
+    hovertemplate:'<b>%{label}</b><br>$%{value:,.0f}<extra></extra>' }], {
+    paper_bgcolor:'transparent',
+    margin:{t:10,b:20,l:20,r:20},
+    legend:{font:{size:12,color:'#374151'}},
+    font:{family:'-apple-system,sans-serif'},
+    showlegend:true,
+  }, { responsive:true, displayModeBar:false });
+}
+
+// ── Table ────────────────────────────────────────────────────────
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = false; }
+  document.querySelectorAll('[id^="arr-"]').forEach(el => {
+    el.textContent = '↕';
+    el.closest && el.closest('th') && el.closest('th').classList.remove('sorted');
+  });
+  const el = document.getElementById('arr-'+col);
+  if (el) { el.textContent = sortAsc ? '↑' : '↓'; el.closest('th').classList.add('sorted'); }
+  renderTable(filtered());
+}
+
+function renderTable(entries) {
+  const rows = [...entries].sort((a,b) => {
+    let va=a[sortCol], vb=b[sortCol];
+    if (typeof va==='string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? +va - +vb : +vb - +va;
+  });
+
+  if (!rows.length) {
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
+    document.getElementById('tbl-footer').textContent = '';
+    return;
+  }
+
+  const amounts = rows.map(e => +e.sales_amount);
+  const hi = Math.max(...amounts), lo = Math.min(...amounts);
+
+  document.getElementById('tbl-body').innerHTML = rows.map(e => {
+    const a = +e.sales_amount;
+    const rc = (a === hi && amounts.filter(x=>x===hi).length===1) ? 'row-top'
+             : (a === lo && amounts.filter(x=>x===lo).length===1) ? 'row-low' : '';
+    const sp = e.shift==='Morning'?'sM':e.shift==='Afternoon'?'sA':'sE';
+    return `<tr class="${rc}">
+      <td class="cell-name"><span class="team-dot t${e.team}"></span>${e.ba_name}</td>
+      <td>${e.team}</td>
+      <td>${e.store||'—'}</td>
+      <td class="cell-amount">$${fmt(a)}</td>
+      <td>${e.items_sold}</td>
+      <td><span class="shift-pill ${sp}">${e.shift}</span></td>
+      <td>${fmtDate(e.entry_date)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbl-footer').textContent = `Showing ${rows.length} record${rows.length!==1?'s':''}`;
+}
+
+// ── Heatmap ──────────────────────────────────────────────────────
+function renderHeatmap(entries) {
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const D2I  = {Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6,Sun:0};
+  const baMap = {};
+  entries.forEach(e => {
+    const d = new Date(e.entry_date+'T12:00:00');
+    const dn = DAYS.find(x => D2I[x]===d.getDay());
+    if (!dn) return;
+    if (!baMap[e.ba_name]) baMap[e.ba_name] = {Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0,Sun:0};
+    baMap[e.ba_name][dn] += e.items_sold;
+  });
+  const baList = Object.keys(baMap);
+  if (!baList.length) { document.getElementById('hmap-body').innerHTML='<p style="color:#9ca3af;padding:20px">No data</p>'; return; }
+  const all = baList.flatMap(b => DAYS.map(d => baMap[b][d]));
+  const max = Math.max(...all)||1;
+  const gc = v => !v?'#f3f4f6': v/max>.75?'#059669': v/max>.5?'#10b981': v/max>.25?'#6ee7b7':'#d1fae5';
+  const tc = v => !v?'#9ca3af':'#065f46';
+  document.getElementById('hmap-body').innerHTML = `
+    <table class="hmap">
+      <thead><tr><th style="text-align:left;min-width:120px">BA</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+      <tbody>${baList.map(b=>`<tr>
+        <td style="background:transparent;color:#374151;font-weight:700;text-align:left;padding:6px 8px">${b}</td>
+        ${DAYS.map(d=>`<td style="background:${gc(baMap[b][d])};color:${tc(baMap[b][d])}">${baMap[b][d]||'—'}</td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table>
+    <p style="font-size:11px;color:#9ca3af;margin-top:12px">Values = PCs sold. Colour intensity = relative volume.</p>`;
+}
+
+// ── View toggle ──────────────────────────────────────────────────
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('view-table').style.display   = mode==='table'   ? '' : 'none';
+  document.getElementById('view-heatmap').style.display = mode==='heatmap' ? '' : 'none';
+  document.getElementById('btn-tbl').classList.toggle('active',  mode==='table');
+  document.getElementById('btn-hmap').classList.toggle('active', mode==='heatmap');
+  if (mode==='heatmap') renderHeatmap(filtered());
+}
+
+// ── Live badge ───────────────────────────────────────────────────
+function updateLiveBadge() {
+  document.getElementById('live-text').textContent = 'Live updates • Last updated just now';
+}
+function startAutoRefresh() {
+  setInterval(() => {
+    const s = Math.round((new Date()-lastUpdated)/1000);
+    const t = s<60 ? s+'s ago' : Math.floor(s/60)+'m ago';
+    document.getElementById('live-text').textContent = `Live updates • Last updated ${t}`;
+  }, 5000);
+  setInterval(loadAll, 60000);
+}
+
+// ── Sign out ─────────────────────────────────────────────────────
+async function signOut() { await sb.auth.signOut(); window.location.href = 'index.html'; }
+
+// ── Helpers ──────────────────────────────────────────────────────
+function fmt(n)    { return Number(n).toLocaleString('en-US',{maximumFractionDigits:0}); }
+function fmtDate(s){ return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+</script>
+</body>
+</html>
