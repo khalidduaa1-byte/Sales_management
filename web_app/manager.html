@@ -332,6 +332,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <button class="page-tab-btn active" id="tab-performance" onclick="setMainTab('performance')">Performance Review</button>
       <button class="page-tab-btn" id="tab-targets" onclick="setMainTab('targets')">Targets & Commissions</button>
       <button class="page-tab-btn" id="tab-daily" onclick="setMainTab('daily')">Daily BA Sales</button>
+      <button class="page-tab-btn" id="tab-profile" onclick="setMainTab('profile')">BA Profile</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
@@ -514,6 +515,39 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
+  <!-- BA Profile -->
+  <div class="sec-lbl profile-section" style="display:none">BA Profile Overview</div>
+  <div class="filter-card profile-section" style="display:none;margin-bottom:14px">
+    <div class="filter-row">
+      <select class="f-sel" id="profile-ba" onchange="renderBAProfile()">
+        <option value="">Select BA</option>
+      </select>
+      <span style="font-size:12px;color:#6b7280" id="profile-summary"></span>
+    </div>
+  </div>
+  <div class="kpi-grid profile-section" style="display:none">
+    <div class="kpi-card"><div class="kpi-val" id="pk0">—</div><div class="kpi-lbl">Sales</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="pk1">—</div><div class="kpi-lbl">Qty</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="pk2">—</div><div class="kpi-lbl">Days Worked</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="pk3">—</div><div class="kpi-lbl">Off Days</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="pk4">—</div><div class="kpi-lbl">Annual Leave</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="pk5">—</div><div class="kpi-lbl">Avg Qty / Working Day</div></div>
+  </div>
+  <div class="table-card profile-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Details</th>
+        </tr></thead>
+        <tbody id="profile-body">
+          <tr><td colspan="3" style="text-align:center;padding:24px;color:#9ca3af">Select a BA to view profile</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -678,10 +712,15 @@ function setMainTab(tab) {
   document.querySelectorAll('.daily-section').forEach(el => {
     el.style.display = tab === 'daily' ? '' : 'none';
   });
+  document.querySelectorAll('.profile-section').forEach(el => {
+    el.style.display = tab === 'profile' ? '' : 'none';
+  });
   document.getElementById('tab-performance').classList.toggle('active', tab === 'performance');
   document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
   document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
+  document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
   if (tab === 'daily') renderDailySales();
+  if (tab === 'profile') renderBAProfile();
   if (tab === 'performance') refreshPerformanceCharts();
 }
 
@@ -769,6 +808,7 @@ async function loadAll() {
 
   rebuildStoreDropdowns();
   rebuildDailyBaDropdown();
+  rebuildProfileBaDropdown();
 
   lastUpdated = new Date();
   updateLiveBadge();
@@ -801,6 +841,18 @@ function rebuildDailyBaDropdown() {
     ...attendanceEntries.map(e => e.ba_name),
   ])].sort();
   sel.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
+  if (names.includes(cur)) sel.value = cur;
+}
+
+function rebuildProfileBaDropdown() {
+  const sel = document.getElementById('profile-ba');
+  if (!sel) return;
+  const cur = sel.value;
+  const names = [...new Set([
+    ...allEntries.map(e => e.ba_name),
+    ...attendanceEntries.map(e => e.ba_name),
+  ])].sort();
+  sel.innerHTML = '<option value="">Select BA</option>' + names.map(n => `<option>${n}</option>`).join('');
   if (names.includes(cur)) sel.value = cur;
 }
 
@@ -916,6 +968,7 @@ function applyFilters() {
   if (viewMode === 'table') renderTable(e);
   else renderHeatmap(e);
   if (mainTab === 'daily') renderDailySales();
+  if (mainTab === 'profile') renderBAProfile();
   if (mainTab === 'performance') {
     requestAnimationFrame(() => plotlyResizeBothCharts());
   }
@@ -1304,8 +1357,21 @@ function renderTable(entries) {
     return;
   }
 
+  const monthRaw = getGlobalMonthRaw();
+  const teamFilter = document.getElementById('f-team').value;
+  const baFilter = document.getElementById('f-ba').value;
+  const shopFilter = document.getElementById('global-store').value || document.getElementById('f-store').value;
+  const monthScopeRows = monthRaw
+    ? allEntries.filter(e => {
+        if (e.entry_date.slice(0, 7) !== monthRaw) return false;
+        if (teamFilter && e.team !== teamFilter) return false;
+        if (baFilter && e.ba_name !== baFilter) return false;
+        if (shopFilter && (e.store || '') !== shopFilter) return false;
+        return true;
+      })
+    : rows;
   const daysWorkedByBA = {};
-  rows.forEach(e => {
+  monthScopeRows.forEach(e => {
     if (!daysWorkedByBA[e.ba_name]) daysWorkedByBA[e.ba_name] = new Set();
     daysWorkedByBA[e.ba_name].add(e.entry_date);
   });
@@ -1454,6 +1520,82 @@ function resetDailyFilters() {
   if (s) s.value = '';
   if (e) e.value = '';
   renderDailySales();
+}
+
+function renderBAProfile() {
+  const ba = (document.getElementById('profile-ba') || {}).value || '';
+  const body = document.getElementById('profile-body');
+  if (!body) return;
+  if (!ba) {
+    body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:24px;color:#9ca3af">Select a BA to view profile</td></tr>';
+    setText('profile-summary', '');
+    ['pk0','pk1','pk2','pk3','pk4','pk5'].forEach(id => setText(id, '—'));
+    return;
+  }
+
+  const monthRaw = getGlobalMonthRaw();
+  const monthKey = getSelectedMonth();
+  const teamFilter = document.getElementById('f-team').value;
+  const shopFilter = document.getElementById('global-store').value || document.getElementById('f-store').value;
+  const monthForFilter = monthRaw || monthKey;
+
+  const salesRows = allEntries.filter(e => {
+    if (e.ba_name !== ba) return false;
+    if (teamFilter && e.team !== teamFilter) return false;
+    if (shopFilter && (e.store || '') !== shopFilter) return false;
+    if (monthForFilter && e.entry_date.slice(0, 7) !== monthForFilter) return false;
+    return true;
+  });
+  const leaveRows = attendanceEntries.filter(e => {
+    if (e.ba_name !== ba) return false;
+    if (teamFilter && e.team !== teamFilter) return false;
+    if (shopFilter && (e.store || '') !== shopFilter) return false;
+    if (monthForFilter && String(e.entry_date).slice(0, 7) !== monthForFilter) return false;
+    return true;
+  });
+
+  const totalSales = salesRows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
+  const totalQty = salesRows.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
+  const totalWD = salesRows.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
+  const daysWorked = new Set(salesRows.map(e => e.entry_date)).size;
+  const offDays = leaveRows.filter(e => e.status === 'off_day').length;
+  const annualLeave = leaveRows.filter(e => e.status === 'annual_leave').length;
+  const avgQtyDay = totalWD ? (totalQty / totalWD) : 0;
+  const avgSalesDay = totalWD ? (totalSales / totalWD) : 0;
+  const avgWorkingPerLog = salesRows.length ? (totalWD / salesRows.length) : 0;
+
+  const shopQty = {};
+  const shiftQty = {};
+  salesRows.forEach(e => {
+    const s = e.store || '—';
+    const sh = e.shift || '—';
+    shopQty[s] = (shopQty[s] || 0) + (Number(e.items_sold) || 0);
+    shiftQty[sh] = (shiftQty[sh] || 0) + (Number(e.items_sold) || 0);
+  });
+  const topShop = Object.entries(shopQty).sort((a, b) => b[1] - a[1])[0];
+  const topShift = Object.entries(shiftQty).sort((a, b) => b[1] - a[1])[0];
+
+  let productivity = 'Needs Support';
+  if (avgQtyDay >= 6) productivity = 'High';
+  else if (avgQtyDay >= 3) productivity = 'Medium';
+
+  const scopeLabel = monthRaw ? monthLabel(monthRaw) : monthLabel(monthKey);
+  setText('profile-summary', `${ba} • ${scopeLabel}${shopFilter ? ' • ' + shopFilter : ''}`);
+  setText('pk0', '$' + fmt(totalSales));
+  setText('pk1', totalQty.toLocaleString());
+  setText('pk2', String(daysWorked));
+  setText('pk3', String(offDays));
+  setText('pk4', String(annualLeave));
+  setText('pk5', avgQtyDay.toFixed(1));
+
+  body.innerHTML = `
+    <tr><td>Productivity level</td><td>${productivity}</td><td>Based on avg qty/day (${avgQtyDay.toFixed(1)})</td></tr>
+    <tr><td>Avg sales / working day</td><td>$${fmt(avgSalesDay)}</td><td>Total sales divided by total working days</td></tr>
+    <tr><td>Avg working days / log</td><td>${avgWorkingPerLog.toFixed(1)}</td><td>Useful to spot batch/monthly uploads</td></tr>
+    <tr><td>Top shop by qty</td><td>${topShop ? topShop[0] : '—'}</td><td>${topShop ? topShop[1] + ' pcs' : 'No sales rows'}</td></tr>
+    <tr><td>Top shift by qty</td><td>${topShift ? topShift[0] : '—'}</td><td>${topShift ? topShift[1] + ' pcs' : 'No sales rows'}</td></tr>
+    <tr><td>Attendance total</td><td>${daysWorked + offDays + annualLeave}</td><td>Worked + Off + Annual leave days in scope</td></tr>
+  `;
 }
 
 function exportDailySales() {
