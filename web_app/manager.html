@@ -440,9 +440,6 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
         <option value="">All Teams</option>
         <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
       </select>
-      <select class="f-sel" id="f-store" onchange="onPerfStoreChange()">
-        <option value="">All Shops</option>
-      </select>
       <select class="f-sel" id="f-ba"    onchange="applyFilters()">
         <option value="">All BAs</option>
       </select>
@@ -519,6 +516,9 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   <div class="sec-lbl profile-section" style="display:none">BA Profile Overview</div>
   <div class="filter-card profile-section" style="display:none;margin-bottom:14px">
     <div class="filter-row">
+      <select class="f-sel" id="profile-month" onchange="renderBAProfile()">
+        <option value="">All Months</option>
+      </select>
       <select class="f-sel" id="profile-ba" onchange="renderBAProfile()">
         <option value="">Select BA</option>
       </select>
@@ -809,6 +809,7 @@ async function loadAll() {
   rebuildStoreDropdowns();
   rebuildDailyBaDropdown();
   rebuildProfileBaDropdown();
+  rebuildProfileMonthDropdown();
 
   lastUpdated = new Date();
   updateLiveBadge();
@@ -822,14 +823,10 @@ function rebuildStoreDropdowns() {
     ...attendanceEntries.map(e => (e.store || '').trim()),
   ].filter(Boolean))].sort();
   const curGlobal = document.getElementById('global-store').value;
-  const curF = document.getElementById('f-store').value;
   const g = document.getElementById('global-store');
-  const f = document.getElementById('f-store');
   const opts = '<option value="">All Shops</option>' + stores.map(s => `<option>${s}</option>`).join('');
   g.innerHTML = opts;
-  f.innerHTML = opts;
   if (stores.includes(curGlobal)) g.value = curGlobal;
-  if (stores.includes(curF)) f.value = curF;
 }
 
 function rebuildDailyBaDropdown() {
@@ -856,15 +853,19 @@ function rebuildProfileBaDropdown() {
   if (names.includes(cur)) sel.value = cur;
 }
 
-function onGlobalStoreChange() {
-  const v = document.getElementById('global-store').value;
-  document.getElementById('f-store').value = v;
-  applyFilters();
+function rebuildProfileMonthDropdown() {
+  const sel = document.getElementById('profile-month');
+  if (!sel) return;
+  const cur = sel.value;
+  const months = [...new Set([
+    ...allEntries.map(e => e.entry_date.slice(0, 7)),
+    ...attendanceEntries.map(e => String(e.entry_date).slice(0, 7)),
+  ])].filter(Boolean).sort();
+  sel.innerHTML = '<option value="">All Months</option>' + months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  if (cur && months.includes(cur)) sel.value = cur;
 }
 
-function onPerfStoreChange() {
-  const v = document.getElementById('f-store').value;
-  document.getElementById('global-store').value = v;
+function onGlobalStoreChange() {
   applyFilters();
 }
 
@@ -928,7 +929,7 @@ function filtered() {
   const team  = document.getElementById('f-team').value;
   const monthRaw = getGlobalMonthRaw();
   const ba    = document.getElementById('f-ba').value;
-  const shop  = document.getElementById('global-store').value || document.getElementById('f-store').value;
+  const shop  = document.getElementById('global-store').value;
   const start = document.getElementById('f-start').value;
   const end   = document.getElementById('f-end').value;
   return allEntries.filter(e => {
@@ -946,7 +947,7 @@ function filtered() {
 function rollupEntries() {
   const team  = document.getElementById('f-team').value;
   const monthRaw = getGlobalMonthRaw();
-  const shop  = document.getElementById('global-store').value || document.getElementById('f-store').value;
+  const shop  = document.getElementById('global-store').value;
   return allEntries.filter(e => {
     if (team  && e.team !== team) return false;
     if (shop  && (e.store || '') !== shop) return false;
@@ -975,7 +976,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['f-team','f-ba','f-start','f-end','f-store','global-store'].forEach(id => {
+  ['f-team','f-ba','f-start','f-end','global-store'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1345,7 +1346,39 @@ function sortBy(col) {
 }
 
 function renderTable(entries) {
-  const rows = [...entries].sort((a,b) => {
+  const byBA = {};
+  entries.forEach(e => {
+    const key = e.ba_name;
+    if (!byBA[key]) {
+      byBA[key] = {
+        ba_name: e.ba_name,
+        team: e.team,
+        sales_amount: 0,
+        items_sold: 0,
+        working_days: 0,
+        _dates: new Set(),
+        _stores: new Set(),
+      };
+    }
+    const r = byBA[key];
+    r.sales_amount += Number(e.sales_amount) || 0;
+    r.items_sold += Number(e.items_sold) || 0;
+    r.working_days += Number(e.working_days) || 1;
+    r._dates.add(e.entry_date);
+    if (e.store) r._stores.add(e.store);
+  });
+
+  const aggregated = Object.values(byBA).map(r => ({
+    ba_name: r.ba_name,
+    team: r.team,
+    store: r._stores.size <= 1 ? ([...r._stores][0] || '—') : 'Mixed',
+    sales_amount: r.sales_amount,
+    items_sold: r.items_sold,
+    qpd: r.working_days ? (r.items_sold / r.working_days) : 0,
+    days_worked: r._dates.size,
+  }));
+
+  const rows = [...aggregated].sort((a,b) => {
     let va=a[sortCol], vb=b[sortCol];
     if (typeof va==='string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
     return sortAsc ? +va - +vb : +vb - +va;
@@ -1360,20 +1393,10 @@ function renderTable(entries) {
   const monthRaw = getGlobalMonthRaw();
   const teamFilter = document.getElementById('f-team').value;
   const baFilter = document.getElementById('f-ba').value;
-  const shopFilter = document.getElementById('global-store').value || document.getElementById('f-store').value;
-  const monthScopeRows = monthRaw
-    ? allEntries.filter(e => {
-        if (e.entry_date.slice(0, 7) !== monthRaw) return false;
-        if (teamFilter && e.team !== teamFilter) return false;
-        if (baFilter && e.ba_name !== baFilter) return false;
-        if (shopFilter && (e.store || '') !== shopFilter) return false;
-        return true;
-      })
-    : rows;
+  const shopFilter = document.getElementById('global-store').value;
   const daysWorkedByBA = {};
-  monthScopeRows.forEach(e => {
-    if (!daysWorkedByBA[e.ba_name]) daysWorkedByBA[e.ba_name] = new Set();
-    daysWorkedByBA[e.ba_name].add(e.entry_date);
+  rows.forEach(e => {
+    daysWorkedByBA[e.ba_name] = e.days_worked;
   });
 
   const amounts = rows.map(e => +e.sales_amount);
@@ -1387,7 +1410,7 @@ function renderTable(entries) {
       <td class="cell-name"><span class="team-dot t${e.team}"></span>${e.ba_name}</td>
       <td>${e.team}</td>
       <td>${e.store||'—'}</td>
-      <td>${(daysWorkedByBA[e.ba_name] ? daysWorkedByBA[e.ba_name].size : 0)}</td>
+      <td>${daysWorkedByBA[e.ba_name] || 0}</td>
       <td class="cell-amount">$${fmt(a)}</td>
       <td>${e.items_sold}</td>
       <td>${(e.qpd||0).toFixed(1)}</td>
@@ -1402,7 +1425,7 @@ function dailyRowsForExport() {
   const end = (document.getElementById('daily-end') || {}).value || '';
   const monthRaw = getGlobalMonthRaw();
   const team = document.getElementById('f-team').value;
-  const shop = (document.getElementById('global-store') || {}).value || (document.getElementById('f-store') || {}).value || '';
+  const shop = (document.getElementById('global-store') || {}).value || '';
 
   let salesRows = [...allEntries];
   let attRows = [...attendanceEntries];
@@ -1453,7 +1476,7 @@ function dailyRowsForExport() {
     team: e.team,
     store: e.store || '',
     shift: '',
-    status: e.status === 'annual_leave' ? 'Annual Leave' : 'Off Day',
+    status: e.status === 'annual_leave' ? 'Annual Leave' : (e.status === 'other' ? 'Other Leave' : 'Off Day'),
     sales_amount: null,
     items_sold: null,
     working_days: null,
@@ -1498,6 +1521,7 @@ function renderDailySales() {
   const leaves = rows.filter(r => r.kind === 'attendance');
   const offDays = leaves.filter(r => r.status === 'Off Day').length;
   const annualLeaves = leaves.filter(r => r.status === 'Annual Leave').length;
+  const otherLeaves = leaves.filter(r => r.status === 'Other Leave').length;
   const totalPcs = salesOnly.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
   const totalWd = salesOnly.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
   const avg = totalWd ? (totalPcs / totalWd).toFixed(1) : '0';
@@ -1508,7 +1532,7 @@ function renderDailySales() {
   const monthText = monthRaw ? monthLabel(monthRaw) : 'All Months';
   const dateText = start || end ? ` • ${start || '…'} → ${end || '…'}` : '';
   if (summary) {
-    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''}${dateText} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves}`;
+    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''}${dateText} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves} • Other leave ${otherLeaves}`;
   }
 }
 
@@ -1533,36 +1557,54 @@ function renderBAProfile() {
     return;
   }
 
-  const monthRaw = getGlobalMonthRaw();
-  const monthKey = getSelectedMonth();
-  const teamFilter = document.getElementById('f-team').value;
-  const shopFilter = document.getElementById('global-store').value || document.getElementById('f-store').value;
-  const monthForFilter = monthRaw || monthKey;
+  const monthRaw = (document.getElementById('profile-month') || {}).value || '';
 
-  const salesRows = allEntries.filter(e => {
+  const salesRowsRaw = allEntries.filter(e => {
     if (e.ba_name !== ba) return false;
-    if (teamFilter && e.team !== teamFilter) return false;
-    if (shopFilter && (e.store || '') !== shopFilter) return false;
-    if (monthForFilter && e.entry_date.slice(0, 7) !== monthForFilter) return false;
+    if (monthRaw && e.entry_date.slice(0, 7) !== monthRaw) return false;
     return true;
   });
-  const leaveRows = attendanceEntries.filter(e => {
+  const leaveRowsRaw = attendanceEntries.filter(e => {
     if (e.ba_name !== ba) return false;
-    if (teamFilter && e.team !== teamFilter) return false;
-    if (shopFilter && (e.store || '') !== shopFilter) return false;
-    if (monthForFilter && String(e.entry_date).slice(0, 7) !== monthForFilter) return false;
+    if (monthRaw && String(e.entry_date).slice(0, 7) !== monthRaw) return false;
     return true;
   });
+
+  // Guardrail for historical imports: dedupe natural keys before KPI math.
+  const salesByKey = new Map();
+  salesRowsRaw.forEach(e => {
+    const key = `${e.ba_name}|${e.entry_date}|${e.store || ''}|${e.shift || ''}`;
+    if (!salesByKey.has(key)) salesByKey.set(key, e);
+  });
+  const salesRows = [...salesByKey.values()];
+
+  const leaveByKey = new Map();
+  leaveRowsRaw.forEach(e => {
+    const key = `${e.ba_name}|${String(e.entry_date)}|${e.status || ''}`;
+    if (!leaveByKey.has(key)) leaveByKey.set(key, e);
+  });
+  const leaveRows = [...leaveByKey.values()];
 
   const totalSales = salesRows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
   const totalQty = salesRows.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
   const totalWD = salesRows.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
-  const daysWorked = new Set(salesRows.map(e => e.entry_date)).size;
-  const offDays = leaveRows.filter(e => e.status === 'off_day').length;
-  const annualLeave = leaveRows.filter(e => e.status === 'annual_leave').length;
+  const workedDaysSet = new Set(salesRows.map(e => e.entry_date));
+  const offDaysSet = new Set(leaveRows.filter(e => e.status === 'off_day').map(e => String(e.entry_date)));
+  const annualLeaveSet = new Set(leaveRows.filter(e => e.status === 'annual_leave').map(e => String(e.entry_date)));
+  const otherLeaveSet = new Set(leaveRows.filter(e => e.status === 'other').map(e => String(e.entry_date)));
+  const daysWorked = workedDaysSet.size;
+  const offDays = offDaysSet.size;
+  const annualLeave = annualLeaveSet.size;
+  const otherLeave = otherLeaveSet.size;
+  const attendanceDaysSet = new Set([
+    ...workedDaysSet,
+    ...offDaysSet,
+    ...annualLeaveSet,
+    ...otherLeaveSet,
+  ]);
   const avgQtyDay = totalWD ? (totalQty / totalWD) : 0;
   const avgSalesDay = totalWD ? (totalSales / totalWD) : 0;
-  const avgWorkingPerLog = salesRows.length ? (totalWD / salesRows.length) : 0;
+  const logsPerWorkedDay = daysWorked ? (salesRows.length / daysWorked) : 0;
 
   const shopQty = {};
   const shiftQty = {};
@@ -1579,8 +1621,8 @@ function renderBAProfile() {
   if (avgQtyDay >= 6) productivity = 'High';
   else if (avgQtyDay >= 3) productivity = 'Medium';
 
-  const scopeLabel = monthRaw ? monthLabel(monthRaw) : monthLabel(monthKey);
-  setText('profile-summary', `${ba} • ${scopeLabel}${shopFilter ? ' • ' + shopFilter : ''}`);
+  const scopeLabel = monthRaw ? monthLabel(monthRaw) : 'All Months';
+  setText('profile-summary', `${ba} • ${scopeLabel}`);
   setText('pk0', '$' + fmt(totalSales));
   setText('pk1', totalQty.toLocaleString());
   setText('pk2', String(daysWorked));
@@ -1591,10 +1633,12 @@ function renderBAProfile() {
   body.innerHTML = `
     <tr><td>Productivity level</td><td>${productivity}</td><td>Based on avg qty/day (${avgQtyDay.toFixed(1)})</td></tr>
     <tr><td>Avg sales / working day</td><td>$${fmt(avgSalesDay)}</td><td>Total sales divided by total working days</td></tr>
-    <tr><td>Avg working days / log</td><td>${avgWorkingPerLog.toFixed(1)}</td><td>Useful to spot batch/monthly uploads</td></tr>
+    <tr><td>Recorded working days (sum)</td><td>${totalWD}</td><td>Sum of working_days across selected rows</td></tr>
+    <tr><td>Logs per worked day</td><td>${logsPerWorkedDay.toFixed(2)}</td><td>Higher than 1 means multiple entries on same worked date</td></tr>
     <tr><td>Top shop by qty</td><td>${topShop ? topShop[0] : '—'}</td><td>${topShop ? topShop[1] + ' pcs' : 'No sales rows'}</td></tr>
     <tr><td>Top shift by qty</td><td>${topShift ? topShift[0] : '—'}</td><td>${topShift ? topShift[1] + ' pcs' : 'No sales rows'}</td></tr>
-    <tr><td>Attendance total</td><td>${daysWorked + offDays + annualLeave}</td><td>Worked + Off + Annual leave days in scope</td></tr>
+    <tr><td>Other leave days</td><td>${otherLeave}</td><td>Sick / public holiday / unknown marker days</td></tr>
+    <tr><td>Attendance total</td><td>${attendanceDaysSet.size}</td><td>Unique attendance dates (Worked / Off / Annual / Other leave)</td></tr>
   `;
 }
 
