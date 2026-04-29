@@ -67,11 +67,16 @@ alter table public.sales_entries
   add column if not exists working_days integer not null default 1;
 
 -- De-duplicate exact same BA/date/store/shift rows (keep newest), then prevent future duplicates.
+-- Important: some historical imports may have ba_id = null, so we fallback to ba_name in the key.
 with ranked as (
   select
     id,
     row_number() over (
-      partition by ba_id, entry_date, store, shift
+      partition by
+        coalesce(ba_id::text, 'name:' || lower(coalesce(ba_name, ''))),
+        entry_date,
+        coalesce(store, ''),
+        coalesce(shift, '')
       order by created_at desc nulls last, id desc
     ) as rn
   from public.sales_entries
@@ -80,8 +85,14 @@ delete from public.sales_entries s
 using ranked r
 where s.id = r.id and r.rn > 1;
 
+-- Enforce uniqueness for normal BA-app inserts (ba_id present).
 create unique index if not exists sales_entries_unique_ba_date_store_shift
   on public.sales_entries (ba_id, entry_date, store, shift);
+
+-- Enforce uniqueness for legacy rows where ba_id is null (fallback to ba_name).
+create unique index if not exists sales_entries_unique_name_date_store_shift_when_no_baid
+  on public.sales_entries (lower(ba_name), entry_date, store, shift)
+  where ba_id is null;
 
 alter table public.monthly_targets enable row level security;
 alter table public.ba_attendance_entries enable row level security;
