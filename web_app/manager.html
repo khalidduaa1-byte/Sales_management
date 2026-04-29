@@ -312,7 +312,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
         <div class="live-badge">
           <div class="live-dot"></div>
           <span class="live-text" id="live-text">Live updates • Last updated just now</span>
-          <span class="build-tag">build 2026-04-29-2</span>
+          <span class="build-tag">build 2026-04-30-fetch-all</span>
         </div>
       </div>
     </div>
@@ -607,6 +607,47 @@ function canonicalBaName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
 }
 
+/** ISO date string YYYY-MM-DD (handles DB dates and single-digit months from imports). */
+function normalizeEntryDate(d) {
+  if (d == null || d === '') return '';
+  let s = String(d);
+  if (s.includes('T')) s = s.slice(0, 10);
+  else s = s.slice(0, 10);
+  const p = s.split('-');
+  if (p.length >= 3) {
+    const y = p[0];
+    const m = String(parseInt(p[1], 10)).padStart(2, '0');
+    const day = String(parseInt(p[2], 10)).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return s;
+}
+
+function monthKeyFromEntryDate(d) {
+  const n = normalizeEntryDate(d);
+  return n.length >= 7 ? n.slice(0, 7) : '';
+}
+
+/** PostgREST defaults to max ~1000 rows; paginate or January / older months disappear. */
+async function fetchAllTableRows(table, orderCol, ascending) {
+  const pageSize = 1000;
+  const rows = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await sb
+      .from(table)
+      .select('*')
+      .order(orderCol, { ascending })
+      .range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: rows, error: null };
+}
+
 // ── Auth ─────────────────────────────────────────────────────────
 (async () => {
   try {
@@ -659,8 +700,8 @@ function buildMonthFilter() {
   const allMonths = new Set([cur]);
   Object.keys(TARGETS).forEach(m => allMonths.add(m));
   Object.keys(dynamicTargets).forEach(m => allMonths.add(m));
-  allEntries.forEach(e => allMonths.add(e.entry_date.slice(0, 7)));
-  attendanceEntries.forEach(e => allMonths.add(String(e.entry_date).slice(0, 7)));
+  allEntries.forEach(e => allMonths.add(monthKeyFromEntryDate(e.entry_date)));
+  attendanceEntries.forEach(e => allMonths.add(monthKeyFromEntryDate(e.entry_date)));
   const opts = [
     { v: '', l: 'All Months' },
     ...[...allMonths].filter(Boolean).sort().map(m => ({ v: m, l: monthLabel(m) })),
@@ -704,7 +745,10 @@ function getSelectedMonth() {
 
 function syncEditorMonthWithGlobal() {
   const editorMonth = document.getElementById('target-month');
-  if (editorMonth && !editorMonth.value) editorMonth.value = getSelectedMonth();
+  if (!editorMonth) return;
+  const raw = getGlobalMonthRaw();
+  if (raw) editorMonth.value = raw;
+  else if (!editorMonth.value) editorMonth.value = getSelectedMonth();
 }
 
 function setMainTab(tab) {
@@ -777,7 +821,7 @@ function commissionRateFromPct(pct) {
 
 // ── Load all entries ─────────────────────────────────────────────
 async function loadAll() {
-  const { data, error } = await sb.from('sales_entries').select('*').order('entry_date', { ascending: false });
+  const { data, error } = await fetchAllTableRows('sales_entries', 'entry_date', false);
   if (error) {
     console.error(error);
     allEntries = [];
@@ -787,6 +831,7 @@ async function loadAll() {
   }
   const rawEntries = (data || []).map(e => ({
     ...e,
+    entry_date: normalizeEntryDate(e.entry_date),
     team: canonicalTeamName(e.team),
     ba_name: canonicalBaName(e.ba_name),
     working_days: e.working_days || 1,
@@ -798,17 +843,14 @@ async function loadAll() {
   dedupeDropped = 0;
   allEntries = rawEntries;
 
-  const { data: attendanceData, error: attendanceError } = await sb
-    .from('ba_attendance_entries')
-    .select('*')
-    .order('entry_date', { ascending: false });
+  const { data: attendanceData, error: attendanceError } = await fetchAllTableRows('ba_attendance_entries', 'entry_date', false);
   if (attendanceError) {
-    // Keep working even if migration wasn't run yet.
     attendanceEntries = [];
     console.warn('ba_attendance_entries not available:', attendanceError.message);
   } else {
     attendanceEntries = (attendanceData || []).map(e => ({
       ...e,
+      entry_date: normalizeEntryDate(e.entry_date),
       team: canonicalTeamName(e.team),
       ba_name: canonicalBaName(e.ba_name),
     }));
@@ -937,7 +979,7 @@ function filtered() {
     if (team  && e.team    !== team)   return false;
     if (ba    && e.ba_name !== ba)     return false;
     if (shop  && (e.store || '') !== shop) return false;
-    if (monthRaw && e.entry_date.slice(0, 7) !== monthRaw) return false;
+    if (monthRaw && monthKeyFromEntryDate(e.entry_date) !== monthRaw) return false;
     return true;
   });
 }
@@ -946,7 +988,7 @@ function filtered() {
 function rollupEntries() {
   const monthRaw = getGlobalMonthRaw();
   if (!monthRaw) return allEntries;
-  return allEntries.filter(e => e.entry_date.slice(0, 7) === monthRaw);
+  return allEntries.filter(e => monthKeyFromEntryDate(e.entry_date) === monthRaw);
 }
 
 function applyFilters() {
@@ -1022,7 +1064,7 @@ function renderTargets(entries) {
   }
 
   const { set: last7Set } = last7WindowForMonth(month);
-  const monthEntries = entries.filter(e => e.entry_date.slice(0, 7) === month);
+  const monthEntries = entries.filter(e => monthKeyFromEntryDate(e.entry_date) === month);
   const monthIsFuture = todayStr.slice(0, 7) < month;
 
   const cards = TEAMS.map(team => {
@@ -1112,7 +1154,7 @@ async function saveTarget() {
 
 function computeCommissionRows() {
   const month = getSelectedMonth();
-  const monthEntries = rollupEntries().filter(e => e.entry_date.slice(0, 7) === month);
+  const monthEntries = rollupEntries().filter(e => monthKeyFromEntryDate(e.entry_date) === month);
   const byTeam = {};
   const byBA = {};
   monthEntries.forEach(e => {
@@ -1427,8 +1469,8 @@ function dailyRowsForExport() {
   let attRows = [...attendanceEntries];
 
   if (monthRaw) {
-    salesRows = salesRows.filter(e => e.entry_date.slice(0, 7) === monthRaw);
-    attRows = attRows.filter(e => String(e.entry_date).slice(0, 7) === monthRaw);
+    salesRows = salesRows.filter(e => monthKeyFromEntryDate(e.entry_date) === monthRaw);
+    attRows = attRows.filter(e => monthKeyFromEntryDate(e.entry_date) === monthRaw);
   }
   if (team) {
     salesRows = salesRows.filter(e => e.team === team);
@@ -1557,12 +1599,12 @@ function renderBAProfile() {
 
   const salesRowsRaw = allEntries.filter(e => {
     if (e.ba_name !== ba) return false;
-    if (monthRaw && e.entry_date.slice(0, 7) !== monthRaw) return false;
+    if (monthRaw && monthKeyFromEntryDate(e.entry_date) !== monthRaw) return false;
     return true;
   });
   const leaveRowsRaw = attendanceEntries.filter(e => {
     if (e.ba_name !== ba) return false;
-    if (monthRaw && String(e.entry_date).slice(0, 7) !== monthRaw) return false;
+    if (monthRaw && monthKeyFromEntryDate(e.entry_date) !== monthRaw) return false;
     return true;
   });
 
