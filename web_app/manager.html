@@ -459,12 +459,13 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
           <th onclick="sortBy('ba_name')">BA Name <span id="arr-ba_name">↕</span></th>
           <th onclick="sortBy('team')">Team <span id="arr-team">↕</span></th>
           <th onclick="sortBy('store')">Store <span id="arr-store">↕</span></th>
+          <th onclick="sortBy('days_worked')">Days Worked <span id="arr-days_worked">↕</span></th>
           <th onclick="sortBy('sales_amount')" class="sorted">Sales <span id="arr-sales_amount">↓</span></th>
           <th onclick="sortBy('items_sold')">Qty <span id="arr-items_sold">↕</span></th>
           <th onclick="sortBy('qpd')">Qty/Day <span id="arr-qpd">↕</span></th>
         </tr></thead>
         <tbody id="tbl-body">
-          <tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -485,6 +486,9 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <select class="f-sel" id="daily-ba" onchange="renderDailySales()">
         <option value="">All BAs</option>
       </select>
+      <input type="date" class="f-date" id="daily-start" onchange="renderDailySales()" title="Daily start date"/>
+      <input type="date" class="f-date" id="daily-end" onchange="renderDailySales()" title="Daily end date"/>
+      <button class="btn-reset" onclick="resetDailyFilters()">↺ Daily Reset</button>
       <button class="btn-reset" onclick="exportDailySales()">↓ Export Daily Excel</button>
       <span style="font-size:12px;color:#6b7280" id="daily-summary"></span>
     </div>
@@ -851,7 +855,7 @@ function showPageError(msg) {
   }
   const body = document.getElementById('tbl-body');
   if (body) {
-    body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
   }
   const dailyBody = document.getElementById('daily-body');
   if (dailyBody) {
@@ -1295,10 +1299,16 @@ function renderTable(entries) {
   });
 
   if (!rows.length) {
-    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
     document.getElementById('tbl-footer').textContent = '';
     return;
   }
+
+  const daysWorkedByBA = {};
+  rows.forEach(e => {
+    if (!daysWorkedByBA[e.ba_name]) daysWorkedByBA[e.ba_name] = new Set();
+    daysWorkedByBA[e.ba_name].add(e.entry_date);
+  });
 
   const amounts = rows.map(e => +e.sales_amount);
   const hi = Math.max(...amounts), lo = Math.min(...amounts);
@@ -1311,6 +1321,7 @@ function renderTable(entries) {
       <td class="cell-name"><span class="team-dot t${e.team}"></span>${e.ba_name}</td>
       <td>${e.team}</td>
       <td>${e.store||'—'}</td>
+      <td>${(daysWorkedByBA[e.ba_name] ? daysWorkedByBA[e.ba_name].size : 0)}</td>
       <td class="cell-amount">$${fmt(a)}</td>
       <td>${e.items_sold}</td>
       <td>${(e.qpd||0).toFixed(1)}</td>
@@ -1321,6 +1332,8 @@ function renderTable(entries) {
 
 function dailyRowsForExport() {
   const ba = (document.getElementById('daily-ba') || {}).value || '';
+  const start = (document.getElementById('daily-start') || {}).value || '';
+  const end = (document.getElementById('daily-end') || {}).value || '';
   const monthRaw = getGlobalMonthRaw();
   const team = document.getElementById('f-team').value;
   const shop = (document.getElementById('global-store') || {}).value || (document.getElementById('f-store') || {}).value || '';
@@ -1343,6 +1356,14 @@ function dailyRowsForExport() {
   if (ba) {
     salesRows = salesRows.filter(e => e.ba_name === ba);
     attRows = attRows.filter(e => e.ba_name === ba);
+  }
+  if (start) {
+    salesRows = salesRows.filter(e => e.entry_date >= start);
+    attRows = attRows.filter(e => String(e.entry_date) >= start);
+  }
+  if (end) {
+    salesRows = salesRows.filter(e => e.entry_date <= end);
+    attRows = attRows.filter(e => String(e.entry_date) <= end);
   }
 
   const mappedSales = salesRows.map(e => ({
@@ -1416,10 +1437,23 @@ function renderDailySales() {
   const avg = totalWd ? (totalPcs / totalWd).toFixed(1) : '0';
   const ba = (document.getElementById('daily-ba') || {}).value || '';
   const monthRaw = getGlobalMonthRaw();
+  const start = (document.getElementById('daily-start') || {}).value || '';
+  const end = (document.getElementById('daily-end') || {}).value || '';
   const monthText = monthRaw ? monthLabel(monthRaw) : 'All Months';
+  const dateText = start || end ? ` • ${start || '…'} → ${end || '…'}` : '';
   if (summary) {
-    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves}`;
+    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''}${dateText} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves}`;
   }
+}
+
+function resetDailyFilters() {
+  const a = document.getElementById('daily-ba');
+  const s = document.getElementById('daily-start');
+  const e = document.getElementById('daily-end');
+  if (a) a.value = '';
+  if (s) s.value = '';
+  if (e) e.value = '';
+  renderDailySales();
 }
 
 function exportDailySales() {
