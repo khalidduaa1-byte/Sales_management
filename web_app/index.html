@@ -165,12 +165,6 @@ input::placeholder { color: #94a3b8; }
       <label>Your Full Name</label>
       <input type="text" id="name" placeholder="e.g. Samah Ali"/>
 
-      <label>Role</label>
-      <select id="role" onchange="toggleTeamField()">
-        <option value="ba">Brand Ambassador (BA)</option>
-        <option value="manager">Retail Manager</option>
-      </select>
-
       <div id="team-store-fields">
         <label>Team</label>
         <select id="team">
@@ -178,9 +172,6 @@ input::placeholder { color: #94a3b8; }
           <option value="Sharm">Sharm</option>
           <option value="Hurgadah">Hurgadah</option>
         </select>
-
-        <label>Store / Location</label>
-        <input type="text" id="store" placeholder="e.g. City Stars"/>
       </div>
     </div>
 
@@ -235,11 +226,6 @@ function switchTab(m) {
   clearMsg();
 }
 
-function toggleTeamField() {
-  const isBA = document.getElementById('role').value === 'ba';
-  document.getElementById('team-store-fields').style.display = isBA ? 'block' : 'none';
-}
-
 // ── Form submit ───────────────────────────────────────────────────
 async function handleSubmit(e) {
   e.preventDefault();  // Stop the page from refreshing (default form behaviour)
@@ -260,9 +246,9 @@ async function handleSubmit(e) {
 
     } else {
       const name  = document.getElementById('name').value.trim();
-      const role  = document.getElementById('role').value;
-      const team  = role === 'ba' ? document.getElementById('team').value : null;
-      const store = role === 'ba' ? document.getElementById('store').value.trim() : null;
+      const role  = 'ba';
+      const team  = document.getElementById('team').value;
+      const store = null;
 
       if (!name) throw new Error('Please enter your name.');
 

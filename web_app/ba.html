@@ -220,6 +220,18 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 .entry-right { text-align: right; }
 .entry-amount { font-size: 18px; font-weight: 800; color: var(--text); }
 .entry-items  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.entry-delete {
+  margin-top: 8px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.entry-delete:hover { background: #ffe4e6; }
 .shift-tag {
   display: inline-block;
   padding: 2px 8px;
@@ -275,6 +287,25 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
       <button class="today-btn" onclick="setToday()">Today</button>
     </div>
 
+    <label>Shop</label>
+    <select id="entry-store">
+      <option value="">Select shop</option>
+      <option value="Terminal 3 Cairo">Terminal 3 Cairo</option>
+      <option value="Terminal 2 Cairo">Terminal 2 Cairo</option>
+      <option value="Terminal 1 Cairo">Terminal 1 Cairo</option>
+      <option value="Sharm Sheikh">Sharm Sheikh</option>
+      <option value="Hurghada russian shop">Hurghada russian shop</option>
+      <option value="Hurghada European shop">Hurghada European shop</option>
+    </select>
+
+    <label>Shift</label>
+    <select id="entry-shift">
+      <option value="">Select shift</option>
+      <option value="Morning">Morning</option>
+      <option value="Afternoon">Afternoon</option>
+      <option value="Evening">Evening</option>
+    </select>
+
     <label>Sales Amount ($)</label>
     <input type="number" id="sales-amount" placeholder="0" min="0" step="0.01"/>
 
@@ -282,6 +313,28 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <input type="number" id="items-sold" placeholder="0" min="0" step="1"/>
 
     <button class="submit-btn" id="submit-btn" onclick="submitSale()">Log Entry ✓</button>
+  </div>
+
+  <!-- Leave / Off days -->
+  <div class="form-card">
+    <h3>Log Off / Leave 🗓️</h3>
+
+    <label>Date</label>
+    <div class="date-row">
+      <input type="date" id="leave-date"/>
+      <button class="today-btn" onclick="setToday()">Today</button>
+    </div>
+
+    <label>Status</label>
+    <select id="leave-type">
+      <option value="off_day">Off Day</option>
+      <option value="annual_leave">Annual Leave</option>
+    </select>
+
+    <label>Notes (Optional)</label>
+    <input type="text" id="leave-notes" placeholder="Any note for manager"/>
+
+    <button class="submit-btn" id="leave-btn" onclick="submitLeave()">Save Status ✓</button>
   </div>
 
   <!-- History -->
@@ -328,7 +381,7 @@ let currentProfile = null;
 
   // Update the header
   document.getElementById('ba-name').textContent = profile.name;
-  document.getElementById('ba-meta').textContent = `${profile.team} · ${profile.store}`;
+  document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
 
   setToday();
   await loadHistory();
@@ -338,7 +391,10 @@ let currentProfile = null;
 // ── Helpers ───────────────────────────────────────────────────────
 function setToday() {
   // toISOString gives us "2026-04-23T..." — we take the first 10 chars for the date
-  document.getElementById('entry-date').value = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('entry-date').value = today;
+  const leaveDate = document.getElementById('leave-date');
+  if (leaveDate) leaveDate.value = today;
 }
 
 // ── Submit a sale ─────────────────────────────────────────────────
@@ -346,8 +402,12 @@ async function submitSale() {
   const amount = parseFloat(document.getElementById('sales-amount').value);
   const items  = parseInt(document.getElementById('items-sold').value);
   const date   = document.getElementById('entry-date').value;
+  const store  = document.getElementById('entry-store').value;
+  const shift  = document.getElementById('entry-shift').value;
 
   if (!date)          return showMsg('Please select a date.', 'error');
+  if (!store)         return showMsg('Please select a shop.', 'error');
+  if (!shift)         return showMsg('Please select a shift.', 'error');
   if (isNaN(amount) || amount <= 0) return showMsg('Enter a valid sales amount.', 'error');
   if (isNaN(items)  || items  <  0) return showMsg('Enter a valid items count.', 'error');
 
@@ -355,18 +415,46 @@ async function submitSale() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  // .insert() adds a new row to the sales_entries table
-  const { error } = await sb.from('sales_entries').insert({
-    ba_id:        currentUser.id,
-    ba_name:      currentProfile.name,
-    team:         currentProfile.team,
-    store:        currentProfile.store,
-    shift:        'Morning',
-    sales_amount: amount,
-    items_sold:   items,
-    working_days: 1,
-    entry_date:   date,
-  });
+  // Prevent duplicates for same BA + date + shop + shift:
+  // if row exists, update it; otherwise insert new.
+  const { data: existingRows, error: findErr } = await sb
+    .from('sales_entries')
+    .select('id')
+    .eq('ba_id', currentUser.id)
+    .eq('entry_date', date)
+    .eq('store', store)
+    .eq('shift', shift)
+    .limit(1);
+
+  let error = findErr;
+  if (!error && existingRows && existingRows.length) {
+    const existingId = existingRows[0].id;
+    const { error: updErr } = await sb
+      .from('sales_entries')
+      .update({
+        ba_name: currentProfile.name,
+        team: currentProfile.team,
+        sales_amount: amount,
+        items_sold: items,
+        working_days: 1,
+      })
+      .eq('id', existingId)
+      .eq('ba_id', currentUser.id);
+    error = updErr;
+  } else if (!error) {
+    const { error: insErr } = await sb.from('sales_entries').insert({
+      ba_id:        currentUser.id,
+      ba_name:      currentProfile.name,
+      team:         currentProfile.team,
+      store,
+      shift,
+      sales_amount: amount,
+      items_sold:   items,
+      working_days: 1,
+      entry_date:   date,
+    });
+    error = insErr;
+  }
 
   btn.disabled = false;
   btn.textContent = 'Log Entry ✓';
@@ -377,39 +465,144 @@ async function submitSale() {
     showMsg('Entry logged successfully!', 'success');
     document.getElementById('sales-amount').value = '';
     document.getElementById('items-sold').value   = '';
+    document.getElementById('entry-shift').value  = '';
     setToday();
     await loadHistory();
     updateStats();
   }
 }
 
+async function deleteSale(saleId) {
+  if (!saleId) return;
+  if (!confirm('Delete this sale entry? This cannot be undone.')) return;
+  const { error } = await sb
+    .from('sales_entries')
+    .delete()
+    .eq('id', saleId)
+    .eq('ba_id', currentUser.id);
+  if (error) {
+    showMsg('Error deleting sale: ' + error.message, 'error');
+    return;
+  }
+  showMsg('Sale entry deleted.', 'success');
+  await loadHistory();
+  updateStats();
+}
+
+// ── Submit an off/leave day ──────────────────────────────────────
+async function submitLeave() {
+  const date = document.getElementById('leave-date').value;
+  const status = document.getElementById('leave-type').value;
+  const notes = document.getElementById('leave-notes').value.trim();
+
+  if (!date) return showMsg('Please select a leave/off date.', 'error');
+  if (!status) return showMsg('Please choose leave status.', 'error');
+
+  const btn = document.getElementById('leave-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const { error } = await sb.from('ba_attendance_entries').upsert({
+    ba_id: currentUser.id,
+    ba_name: currentProfile.name,
+    team: currentProfile.team,
+    store: currentProfile.store || null,
+    entry_date: date,
+    status,
+    notes: notes || null,
+  }, { onConflict: 'ba_id,entry_date' });
+
+  btn.disabled = false;
+  btn.textContent = 'Save Status ✓';
+
+  if (error) {
+    showMsg('Error saving leave/off day: ' + error.message, 'error');
+  } else {
+    showMsg('Leave/off day saved.', 'success');
+    document.getElementById('leave-notes').value = '';
+    setToday();
+    await loadHistory();
+  }
+}
+
 // ── Load history ──────────────────────────────────────────────────
 async function loadHistory() {
-  // .select() fetches rows, .eq() filters to this BA only, .order() sorts by date
+  // sales history
   const { data: entries } = await sb
     .from('sales_entries')
     .select('*')
     .eq('ba_id', currentUser.id)
     .order('entry_date', { ascending: false })
     .limit(30);
+  // attendance history (off day / annual leave)
+  const { data: attendance } = await sb
+    .from('ba_attendance_entries')
+    .select('*')
+    .eq('ba_id', currentUser.id)
+    .order('entry_date', { ascending: false })
+    .limit(30);
 
   const list = document.getElementById('history-list');
-  if (!entries || entries.length === 0) {
+  const salesRows = (entries || []).map(e => ({
+    kind: 'sale',
+    id: e.id,
+    entry_date: e.entry_date,
+    created_at: e.created_at,
+    store: e.store,
+    shift: e.shift,
+    sales_amount: e.sales_amount,
+    items_sold: e.items_sold,
+  }));
+  const attRows = (attendance || []).map(a => ({
+    kind: 'attendance',
+    entry_date: a.entry_date,
+    created_at: a.created_at,
+    status: a.status,
+    notes: a.notes,
+  }));
+  const rows = [...salesRows, ...attRows]
+    .sort((a, b) => {
+      if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
+      const ac = a.created_at || '';
+      const bc = b.created_at || '';
+      return ac < bc ? 1 : -1;
+    })
+    .slice(0, 40);
+
+  if (!rows.length) {
     list.innerHTML = '<div class="empty-state">No submissions yet — log your first shift above!</div>';
     return;
   }
 
-  list.innerHTML = entries.map(e => `
-    <div class="entry-row">
-      <div class="entry-left">
-        <div class="entry-date">${formatDate(e.entry_date)}</div>
+  list.innerHTML = rows.map(r => {
+    if (r.kind === 'sale') {
+      return `
+        <div class="entry-row">
+          <div class="entry-left">
+            <div class="entry-date">${formatDate(r.entry_date)} • Sale</div>
+            <div class="entry-meta">${r.store || '—'} • ${r.shift || '—'}</div>
+          </div>
+          <div class="entry-right">
+            <div class="entry-amount">$${Number(r.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+            <div class="entry-items">${r.items_sold} pcs</div>
+            <button class="entry-delete" onclick="deleteSale('${r.id}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }
+    const statusLabel = r.status === 'annual_leave' ? 'Annual Leave' : 'Off Day';
+    return `
+      <div class="entry-row">
+        <div class="entry-left">
+          <div class="entry-date">${formatDate(r.entry_date)} • ${statusLabel}</div>
+          <div class="entry-meta">${r.notes || 'No notes'}</div>
+        </div>
+        <div class="entry-right">
+          <div class="entry-items">No sales expected</div>
+        </div>
       </div>
-      <div class="entry-right">
-        <div class="entry-amount">$${Number(e.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
-        <div class="entry-items">${e.items_sold} pcs</div>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ── Update stats ──────────────────────────────────────────────────

@@ -47,11 +47,44 @@ create table if not exists public.monthly_targets (
   unique (month_key, team)
 );
 
+-- TABLE 4: ba_attendance_entries
+-- One row = one BA marked as off day / annual leave on a date.
+create table if not exists public.ba_attendance_entries (
+  id          uuid primary key default gen_random_uuid(),
+  ba_id       uuid references public.profiles(id) on delete cascade,
+  ba_name     text not null,
+  team        text not null,
+  store       text,
+  entry_date  date not null,
+  status      text not null check (status in ('off_day', 'annual_leave')),
+  notes       text,
+  created_at  timestamptz default now(),
+  unique (ba_id, entry_date)
+);
+
 -- Add working_days to existing databases (safe to run even if column already exists)
 alter table public.sales_entries
   add column if not exists working_days integer not null default 1;
 
+-- De-duplicate exact same BA/date/store/shift rows (keep newest), then prevent future duplicates.
+with ranked as (
+  select
+    id,
+    row_number() over (
+      partition by ba_id, entry_date, store, shift
+      order by created_at desc nulls last, id desc
+    ) as rn
+  from public.sales_entries
+)
+delete from public.sales_entries s
+using ranked r
+where s.id = r.id and r.rn > 1;
+
+create unique index if not exists sales_entries_unique_ba_date_store_shift
+  on public.sales_entries (ba_id, entry_date, store, shift);
+
 alter table public.monthly_targets enable row level security;
+alter table public.ba_attendance_entries enable row level security;
 
 -- ── Row Level Security (RLS) ─────────────────────────────────────
 -- RLS means: users can only see/edit data they're allowed to.
@@ -69,6 +102,10 @@ drop policy if exists "BAs can read own sales"        on public.sales_entries;
 drop policy if exists "Managers can read all sales"   on public.sales_entries;
 drop policy if exists "Managers can read monthly targets" on public.monthly_targets;
 drop policy if exists "Managers can write monthly targets" on public.monthly_targets;
+drop policy if exists "BAs can insert own attendance" on public.ba_attendance_entries;
+drop policy if exists "BAs can read own attendance" on public.ba_attendance_entries;
+drop policy if exists "BAs can update own attendance" on public.ba_attendance_entries;
+drop policy if exists "Managers can read all attendance" on public.ba_attendance_entries;
 
 -- Helper function: check if the current user is a manager.
 -- Must be security definer so it runs as the owner (bypasses RLS),
@@ -119,6 +156,24 @@ create policy "Managers can write monthly targets"
   on public.monthly_targets for all
   using (public.is_manager())
   with check (public.is_manager());
+
+-- ba_attendance_entries: BAs can insert/read/update their own; managers read all
+create policy "BAs can insert own attendance"
+  on public.ba_attendance_entries for insert
+  with check (ba_id = auth.uid());
+
+create policy "BAs can read own attendance"
+  on public.ba_attendance_entries for select
+  using (ba_id = auth.uid());
+
+create policy "BAs can update own attendance"
+  on public.ba_attendance_entries for update
+  using (ba_id = auth.uid())
+  with check (ba_id = auth.uid());
+
+create policy "Managers can read all attendance"
+  on public.ba_attendance_entries for select
+  using (public.is_manager());
 
 -- ── Auto-create profile on signup ────────────────────────────────
 -- This is a "trigger" — it fires automatically when someone signs up.

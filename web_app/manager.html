@@ -331,10 +331,15 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <div class="page-tabs">
       <button class="page-tab-btn active" id="tab-performance" onclick="setMainTab('performance')">Performance Review</button>
       <button class="page-tab-btn" id="tab-targets" onclick="setMainTab('targets')">Targets & Commissions</button>
+      <button class="page-tab-btn" id="tab-daily" onclick="setMainTab('daily')">Daily BA Sales</button>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
       <select class="f-sel" id="global-month" onchange="applyFilters()" style="min-width:150px"></select>
+      <span class="sec-lbl" style="margin:0">Shop</span>
+      <select class="f-sel" id="global-store" onchange="onGlobalStoreChange()" style="min-width:160px">
+        <option value="">All Shops</option>
+      </select>
     </div>
   </div>
 
@@ -344,7 +349,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-val" id="kv0">—</div><div class="kpi-lbl">Today's Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon green"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-val" id="kv1">—</div><div class="kpi-lbl">Monthly Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div><div class="kpi-val" id="kv2">—</div><div class="kpi-lbl">Total PCs Sold</div></div>
-    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="kpi-val" id="kv3">—</div><div class="kpi-lbl">Avg PCs / BA</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="kpi-val" id="kv3">—</div><div class="kpi-lbl">Avg PCs / BA / Day</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon pink"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div></div><div class="kpi-val" id="kv4" style="font-size:15px">—</div><div class="kpi-lbl">Top Performer</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div></div><div class="kpi-val" id="kv5">—</div><div class="kpi-lbl">Active BAs</div></div>
   </div>
@@ -353,6 +358,15 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   <div class="target-section" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
     <div class="sec-lbl" style="margin:0">Monthly Team Targets</div>
     <span id="days-badge" style="font-size:11px;padding:3px 10px;border-radius:99px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:600"></span>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;margin-left:auto">
+      Sort cards
+      <select class="f-sel" id="target-sort" onchange="onTargetSortChange()" style="min-width:140px">
+        <option value="team">Team (A–Z)</option>
+        <option value="pct_desc">Attainment (high → low)</option>
+        <option value="pct_asc">Attainment (low → high)</option>
+        <option value="gap_desc">Gap to target (largest first)</option>
+      </select>
+    </label>
   </div>
   <div class="filter-card target-section" style="margin-bottom:14px">
     <div class="filter-row">
@@ -386,14 +400,14 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>BA Name</th>
-          <th>Team</th>
-          <th>Month</th>
-          <th>Sales</th>
-          <th>Target</th>
-          <th>Attainment</th>
-          <th>Rate</th>
-          <th>Commission</th>
+          <th onclick="sortCommissions('ba_name')">BA Name <span id="carr-ba_name">↕</span></th>
+          <th onclick="sortCommissions('team')">Team <span id="carr-team">↕</span></th>
+          <th onclick="sortCommissions('month')">Month <span id="carr-month">↕</span></th>
+          <th onclick="sortCommissions('sales')" class="sorted">Sales <span id="carr-sales">↓</span></th>
+          <th onclick="sortCommissions('basis')">Target <span id="carr-basis">↕</span></th>
+          <th onclick="sortCommissions('attainment')">Attainment <span id="carr-attainment">↕</span></th>
+          <th onclick="sortCommissions('rate')">Rate <span id="carr-rate">↕</span></th>
+          <th onclick="sortCommissions('commission')">Commission <span id="carr-commission">↕</span></th>
         </tr></thead>
         <tbody id="comm-body">
           <tr><td colspan="8" style="text-align:center;padding:24px;color:#9ca3af">Loading…</td></tr>
@@ -434,6 +448,9 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
         <option value="">All Teams</option>
         <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
       </select>
+      <select class="f-sel" id="f-store" onchange="onPerfStoreChange()">
+        <option value="">All Shops</option>
+      </select>
       <select class="f-sel" id="f-ba"    onchange="applyFilters()">
         <option value="">All BAs</option>
       </select>
@@ -454,10 +471,9 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
           <th onclick="sortBy('sales_amount')" class="sorted">Sales <span id="arr-sales_amount">↓</span></th>
           <th onclick="sortBy('items_sold')">Qty <span id="arr-items_sold">↕</span></th>
           <th onclick="sortBy('qpd')">Qty/Day <span id="arr-qpd">↕</span></th>
-          <th onclick="sortBy('entry_date')">Date <span id="arr-entry_date">↕</span></th>
         </tr></thead>
         <tbody id="tbl-body">
-          <tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -468,6 +484,37 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   <div class="table-card perf-section" id="view-heatmap" style="display:none">
     <div class="hmap-wrap" id="hmap-body">
       <p style="color:#9ca3af">Loading…</p>
+    </div>
+  </div>
+
+  <!-- Daily BA Sales -->
+  <div class="sec-lbl daily-section" style="display:none">Daily BA Sales</div>
+  <div class="filter-card daily-section" style="display:none;margin-bottom:14px">
+    <div class="filter-row">
+      <select class="f-sel" id="daily-ba" onchange="renderDailySales()">
+        <option value="">All BAs</option>
+      </select>
+      <button class="btn-reset" onclick="exportDailySales()">↓ Export Daily Excel</button>
+      <span style="font-size:12px;color:#6b7280" id="daily-summary"></span>
+    </div>
+  </div>
+  <div class="table-card daily-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Date</th>
+          <th>BA</th>
+          <th>Team</th>
+          <th>Shop</th>
+          <th>Status</th>
+          <th>Sales</th>
+          <th>Qty</th>
+          <th>Qty/Day</th>
+        </tr></thead>
+        <tbody id="daily-body">
+          <tr><td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -505,6 +552,7 @@ const TARGETS = {
 const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
 
 let allEntries = [];
+let attendanceEntries = [];
 let sortCol = 'sales_amount', sortAsc = false;
 let viewMode = 'table';
 let lastUpdated = new Date();
@@ -514,6 +562,8 @@ let lastCommissionRows = [];
 let dedupeDropped = 0;
 let teamHeadcount = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
 let mainTab = 'performance';
+let commSortCol = 'sales';
+let commSortAsc = false;
 
 // ── Auth ─────────────────────────────────────────────────────────
 (async () => {
@@ -544,11 +594,21 @@ let mainTab = 'performance';
 
 // ── Days remaining ───────────────────────────────────────────────
 function buildDaysBadge() {
-  const now = new Date();
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const rem  = last - now.getDate();
-  const el   = document.getElementById('days-badge');
-  if (el) el.textContent = rem + ' day' + (rem !== 1 ? 's' : '') + ' remaining in month';
+  const monthKey = getSelectedMonth();
+  if (!monthKey) return;
+  const { y, m } = parseMonthKey(monthKey);
+  const today = new Date();
+  const curY = today.getFullYear();
+  const curM = today.getMonth() + 1;
+  const lastDay = new Date(y, m, 0).getDate();
+  const el = document.getElementById('days-badge');
+  if (!el) return;
+  if (y === curY && m === curM) {
+    const rem = lastDay - today.getDate();
+    el.textContent = rem + ' day' + (rem !== 1 ? 's' : '') + ' remaining in month';
+  } else {
+    el.textContent = monthLabel(monthKey) + ' • ' + lastDay + ' days in month';
+  }
 }
 
 // ── Month filter ─────────────────────────────────────────────────
@@ -571,8 +631,15 @@ function buildMonthFilter() {
   });
   opts.sort((a, b) => a.v.localeCompare(b.v));
   const sel = document.getElementById('global-month');
-  const current = sel.value || cur;
-  sel.innerHTML = opts.map(o => `<option value="${o.v}"${o.v === current ? ' selected' : ''}>${o.l}</option>`).join('');
+  const hadInit = sel.dataset.monthReady === '1';
+  const prev = hadInit ? sel.value : null;
+  sel.innerHTML = opts.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
+  sel.dataset.monthReady = '1';
+  let pick;
+  if (prev === null) pick = cur;
+  else if (opts.some(o => o.v === prev)) pick = prev;
+  else pick = cur;
+  sel.value = pick;
 }
 
 function monthLabel(monthKey) {
@@ -587,8 +654,16 @@ function getCurrentMonthKey() {
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 }
 
+/** Raw value from Month dropdown: '' = All Months */
+function getGlobalMonthRaw() {
+  const el = document.getElementById('global-month');
+  return el ? el.value : '';
+}
+
+/** Month key used when a single calendar month is required (targets editor, commissions period when unset). */
 function getSelectedMonth() {
-  return document.getElementById('global-month').value || getCurrentMonthKey();
+  const raw = getGlobalMonthRaw();
+  return raw || getCurrentMonthKey();
 }
 
 function syncEditorMonthWithGlobal() {
@@ -604,8 +679,14 @@ function setMainTab(tab) {
   document.querySelectorAll('.target-section').forEach(el => {
     el.style.display = tab === 'targets' ? '' : 'none';
   });
+  document.querySelectorAll('.daily-section').forEach(el => {
+    el.style.display = tab === 'daily' ? '' : 'none';
+  });
   document.getElementById('tab-performance').classList.toggle('active', tab === 'performance');
   document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
+  document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
+  if (tab === 'daily') renderDailySales();
+  if (tab === 'performance') refreshPerformanceCharts();
 }
 
 async function loadTeamHeadcount() {
@@ -673,15 +754,101 @@ async function loadAll() {
   dedupeDropped = 0;
   allEntries = rawEntries;
 
+  const { data: attendanceData, error: attendanceError } = await sb
+    .from('ba_attendance_entries')
+    .select('*')
+    .order('entry_date', { ascending: false });
+  if (attendanceError) {
+    // Keep working even if migration wasn't run yet.
+    attendanceEntries = [];
+    console.warn('ba_attendance_entries not available:', attendanceError.message);
+  } else {
+    attendanceEntries = attendanceData || [];
+  }
+
   // Populate BA filter
   const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
   const fba = document.getElementById('f-ba');
   fba.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
 
+  rebuildStoreDropdowns();
+  rebuildDailyBaDropdown();
+
   lastUpdated = new Date();
   updateLiveBadge();
   buildMonthFilter();
   applyFilters();
+}
+
+function rebuildStoreDropdowns() {
+  const stores = [...new Set([
+    ...allEntries.map(e => (e.store || '').trim()),
+    ...attendanceEntries.map(e => (e.store || '').trim()),
+  ].filter(Boolean))].sort();
+  const curGlobal = document.getElementById('global-store').value;
+  const curF = document.getElementById('f-store').value;
+  const g = document.getElementById('global-store');
+  const f = document.getElementById('f-store');
+  const opts = '<option value="">All Shops</option>' + stores.map(s => `<option>${s}</option>`).join('');
+  g.innerHTML = opts;
+  f.innerHTML = opts;
+  if (stores.includes(curGlobal)) g.value = curGlobal;
+  if (stores.includes(curF)) f.value = curF;
+}
+
+function rebuildDailyBaDropdown() {
+  const sel = document.getElementById('daily-ba');
+  if (!sel) return;
+  const cur = sel.value;
+  const names = [...new Set([
+    ...allEntries.map(e => e.ba_name),
+    ...attendanceEntries.map(e => e.ba_name),
+  ])].sort();
+  sel.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
+  if (names.includes(cur)) sel.value = cur;
+}
+
+function onGlobalStoreChange() {
+  const v = document.getElementById('global-store').value;
+  document.getElementById('f-store').value = v;
+  applyFilters();
+}
+
+function onPerfStoreChange() {
+  const v = document.getElementById('f-store').value;
+  document.getElementById('global-store').value = v;
+  applyFilters();
+}
+
+function parseMonthKey(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return { y, m };
+}
+
+function monthEndDateStr(monthKey) {
+  const { y, m } = parseMonthKey(monthKey);
+  const last = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`;
+}
+
+function lastNDatesInclusive(endStr, n) {
+  const end = new Date(endStr + 'T12:00:00');
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function last7WindowForMonth(monthKey) {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthEnd = monthEndDateStr(monthKey);
+  const end = today < monthEnd ? today : monthEnd;
+  const dates = lastNDatesInclusive(end, 7);
+  const set = new Set(dates);
+  return { end, dates, set };
 }
 
 function showPageError(msg) {
@@ -692,7 +859,11 @@ function showPageError(msg) {
   }
   const body = document.getElementById('tbl-body');
   if (body) {
-    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+  }
+  const dailyBody = document.getElementById('daily-body');
+  if (dailyBody) {
+    dailyBody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
   }
   const commBody = document.getElementById('comm-body');
   if (commBody) {
@@ -707,34 +878,58 @@ function renderDedupeInfo() {
 // ── Filters ──────────────────────────────────────────────────────
 function filtered() {
   const team  = document.getElementById('f-team').value;
-  const month = getSelectedMonth();
+  const monthRaw = getGlobalMonthRaw();
   const ba    = document.getElementById('f-ba').value;
+  const shop  = document.getElementById('global-store').value || document.getElementById('f-store').value;
   const start = document.getElementById('f-start').value;
   const end   = document.getElementById('f-end').value;
   return allEntries.filter(e => {
     if (team  && e.team    !== team)   return false;
     if (ba    && e.ba_name !== ba)     return false;
-    if (month && e.entry_date.slice(0,7) !== month) return false;
+    if (shop  && (e.store || '') !== shop) return false;
+    if (monthRaw && e.entry_date.slice(0, 7) !== monthRaw) return false;
     if (start && e.entry_date < start) return false;
     if (end   && e.entry_date > end)   return false;
     return true;
   });
 }
 
+/** Month + shop + team only — ignores BA / date-range drill-down so Targets & Commissions stay full-month. */
+function rollupEntries() {
+  const team  = document.getElementById('f-team').value;
+  const monthRaw = getGlobalMonthRaw();
+  const shop  = document.getElementById('global-store').value || document.getElementById('f-store').value;
+  return allEntries.filter(e => {
+    if (team  && e.team !== team) return false;
+    if (shop  && (e.store || '') !== shop) return false;
+    if (monthRaw && e.entry_date.slice(0, 7) !== monthRaw) return false;
+    return true;
+  });
+}
+
 function applyFilters() {
   syncEditorMonthWithGlobal();
+  buildDaysBadge();
   const e = filtered();
+  const roll = rollupEntries();
   renderDedupeInfo();
   renderKPIs(e);
-  renderTargets(e);
+  renderTargets(roll);
   renderCommissions();
   renderCharts(e);
   if (viewMode === 'table') renderTable(e);
   else renderHeatmap(e);
+  if (mainTab === 'daily') renderDailySales();
+  if (mainTab === 'performance') {
+    requestAnimationFrame(() => plotlyResizeBothCharts());
+  }
 }
 
 function resetFilters() {
-  ['f-team','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
+  ['f-team','f-ba','f-start','f-end','f-store','global-store'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   syncEditorMonthWithGlobal();
   applyFilters();
 }
@@ -746,7 +941,8 @@ function renderKPIs(entries) {
   const mthSales   = entries.reduce((s,e) => s + +e.sales_amount, 0);
   const totalPcs   = entries.reduce((s,e) => s + e.items_sold, 0);
   const bas        = new Set(entries.map(e => e.ba_name));
-  const avgPcs     = bas.size ? (totalPcs / bas.size).toFixed(1) : '0';
+  const totalWorkingDays = entries.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
+  const avgPcsPerDay = totalWorkingDays ? (totalPcs / totalWorkingDays).toFixed(1) : '0';
   const byBA       = {};
   entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name]||0) + +e.sales_amount; });
   const top        = Object.entries(byBA).sort((a,b) => b[1]-a[1])[0];
@@ -754,41 +950,60 @@ function renderKPIs(entries) {
   setText('kv0', '$' + fmt(todaySales));
   setText('kv1', '$' + fmt(mthSales));
   setText('kv2', totalPcs.toLocaleString());
-  setText('kv3', avgPcs);
+  setText('kv3', avgPcsPerDay);
   setText('kv4', top ? top[0] : '—');
   setText('kv5', bas.size);
 }
 
 // ── Team targets ─────────────────────────────────────────────────
+function onTargetSortChange() {
+  renderTargets(rollupEntries());
+}
+
 function renderTargets(entries) {
   const month = getSelectedMonth();
-  const now   = new Date();
-  const last  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const dLeft = last - now.getDate();
-  const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate()-7);
-  const sevenKey = sevenAgo.toISOString().slice(0,10);
-  const monthEntries = allEntries.filter(e => e.entry_date.slice(0, 7) === month);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const { y: selY, m: selM } = parseMonthKey(month);
+  const lastDayThisMonth = new Date(selY, selM, 0).getDate();
 
-  document.getElementById('target-grid').innerHTML = TEAMS.map(team => {
+  let dLeft = 0;
+  if (month === todayStr.slice(0, 7)) {
+    dLeft = Math.max(0, lastDayThisMonth - new Date().getDate());
+  } else if (todayStr.slice(0, 7) < month) {
+    dLeft = lastDayThisMonth;
+  } else {
+    dLeft = 0;
+  }
+
+  const { set: last7Set } = last7WindowForMonth(month);
+  const monthEntries = entries.filter(e => e.entry_date.slice(0, 7) === month);
+  const monthIsFuture = todayStr.slice(0, 7) < month;
+
+  const sortMode = (document.getElementById('target-sort') || {}).value || 'team';
+  const cards = TEAMS.map(team => {
     const te      = monthEntries.filter(e => e.team === team);
     const sales   = te.reduce((s,e) => s + +e.sales_amount, 0);
-    const pcs     = te.reduce((s,e) => s + e.items_sold, 0);
     const uniqBAs = new Set(te.map(e => e.ba_name)).size;
     const teamSize = Math.max(teamHeadcount[team] || 0, uniqBAs);
     const tgt     = getTeamMonthlyTarget(month, team, teamSize);
     const pct     = tgt ? (sales / tgt) * 100 : 0;
     const rem     = tgt ? Math.max(0, tgt - sales) : null;
     const dailyNeed = rem && dLeft > 0 ? rem / dLeft : 0;
-    const avg7Sales = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + +e.sales_amount, 0) / 7;
-    const avg7Qty   = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + (Number(e.items_sold) || 0), 0) / 7;
-    const onTrack = tgt ? avg7Sales >= dailyNeed : true;
+    const te7 = te.filter(e => last7Set.has(e.entry_date));
+    const sum7Sales = te7.reduce((s,e) => s + +e.sales_amount, 0);
+    const sum7Qty   = te7.reduce((s,e) => s + (Number(e.items_sold) || 0), 0);
+    const avg7Sales = monthIsFuture ? null : sum7Sales / 7;
+    const avg7Qty   = monthIsFuture ? null : sum7Qty / 7;
+    const onTrack = tgt
+      ? (dailyNeed <= 0 ? true : (avg7Sales !== null ? avg7Sales >= dailyNeed : true))
+      : true;
 
     const barGrad = pct >= 95 ? 'linear-gradient(90deg,#059669,#10b981)'
                   : pct >= 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)'
                   :             'linear-gradient(90deg,#f59e0b,#ef4444)';
     const c = TEAM_COLORS[team];
 
-    return `<div class="target-card">
+    return { team, html: `<div class="target-card">
       <div class="target-top">
         <div class="target-left">
           <div class="target-name">
@@ -805,10 +1020,24 @@ function renderTargets(entries) {
       <div class="target-stats">
         <div><div class="ts-lbl">Remaining</div><div class="ts-val">${rem !== null ? '$'+(rem/1000).toFixed(1)+'k' : '—'}</div></div>
         <div><div class="ts-lbl">Daily needed</div><div class="ts-val">${dailyNeed > 0 ? '$'+(dailyNeed/1000).toFixed(1)+'k' : '—'}</div></div>
-        <div><div class="ts-lbl">7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">${avg7Qty.toFixed(1)} pcs</div></div>
+        <div><div class="ts-lbl">Last 7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">${avg7Qty === null ? '—' : (avg7Qty.toFixed(1) + ' pcs')}</div></div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`,
+      pct,
+      rem: rem ?? 0,
+      tgt: tgt ?? 0,
+    };
+  });
+
+  cards.sort((a, b) => {
+    if (sortMode === 'team') return a.team.localeCompare(b.team);
+    if (sortMode === 'pct_desc') return b.pct - a.pct || a.team.localeCompare(b.team);
+    if (sortMode === 'pct_asc') return a.pct - b.pct || a.team.localeCompare(b.team);
+    if (sortMode === 'gap_desc') return b.rem - a.rem || a.team.localeCompare(b.team);
+    return a.team.localeCompare(b.team);
+  });
+
+  document.getElementById('target-grid').innerHTML = cards.map(c => c.html).join('');
 }
 
 async function saveTarget() {
@@ -844,7 +1073,7 @@ async function saveTarget() {
 
 function computeCommissionRows() {
   const month = getSelectedMonth();
-  const monthEntries = allEntries.filter(e => e.entry_date.slice(0, 7) === month);
+  const monthEntries = rollupEntries().filter(e => e.entry_date.slice(0, 7) === month);
   const byTeam = {};
   const byBA = {};
   monthEntries.forEach(e => {
@@ -900,14 +1129,58 @@ function computeCommissionRows() {
     });
 }
 
+function sortCommissions(col) {
+  if (commSortCol === col) commSortAsc = !commSortAsc;
+  else {
+    commSortCol = col;
+    commSortAsc = col === 'ba_name' || col === 'team' || col === 'month' || col === 'basis';
+  }
+  renderCommissions();
+}
+
+function syncCommissionSortIndicators() {
+  document.querySelectorAll('[id^="carr-"]').forEach(el => {
+    el.textContent = '↕';
+    const th = el.closest && el.closest('th');
+    if (th) th.classList.remove('sorted');
+  });
+  const el = document.getElementById('carr-' + commSortCol);
+  if (el) {
+    el.textContent = commSortAsc ? '↑' : '↓';
+    const th = el.closest('th');
+    if (th) th.classList.add('sorted');
+  }
+}
+
 function renderCommissions() {
-  const rows = computeCommissionRows();
+  const rowsUnsorted = computeCommissionRows();
+  const rows = [...rowsUnsorted].sort((a, b) => {
+    let va, vb;
+    switch (commSortCol) {
+      case 'ba_name':
+      case 'team':
+      case 'month':
+        va = String(a[commSortCol] ?? '');
+        vb = String(b[commSortCol] ?? '');
+        return commSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      case 'basis': {
+        const na = parseFloat(String(a.basis).replace(/[^0-9.-]/g, '')) || 0;
+        const nb = parseFloat(String(b.basis).replace(/[^0-9.-]/g, '')) || 0;
+        return commSortAsc ? na - nb : nb - na;
+      }
+      default:
+        va = a[commSortCol];
+        vb = b[commSortCol];
+        return commSortAsc ? +va - +vb : +vb - +va;
+    }
+  });
   lastCommissionRows = rows;
   const tbody = document.getElementById('comm-body');
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#9ca3af">No entries for selected month</td></tr>';
     setText('comm-total', '$0');
     setText('comm-sub', `No commission rows for ${monthLabel(getSelectedMonth())}.`);
+    syncCommissionSortIndicators();
     return;
   }
   const total = rows.reduce((s, r) => s + r.commission, 0);
@@ -928,52 +1201,92 @@ function renderCommissions() {
       <td class="cell-amount">$${fmt(r.commission)}</td>
     </tr>`;
   }).join('');
+  syncCommissionSortIndicators();
 }
 
 // ── Charts ───────────────────────────────────────────────────────
+function plotlyResizeBothCharts() {
+  if (!window.Plotly) return;
+  ['chart-ba', 'chart-spd'].forEach(id => {
+    const gd = document.getElementById(id);
+    if (gd) Plotly.Plots.resize(gd);
+  });
+}
+
+function refreshPerformanceCharts() {
+  renderCharts(filtered());
+  requestAnimationFrame(() => plotlyResizeBothCharts());
+}
+
 function renderCharts(entries) {
+  const layoutBase = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: '#fafafa',
+    font: { family: '-apple-system,sans-serif', color: '#374151' },
+    bargap: 0.35,
+    annotations: [],
+  };
+  const layoutEmpty = {
+    ...layoutBase,
+    margin: { t: 10, b: 80, l: 40, r: 10 },
+    xaxis: { visible: false },
+    yaxis: { visible: false },
+    annotations: [{
+      text: 'No data for current filters',
+      xref: 'paper',
+      yref: 'paper',
+      x: 0.5,
+      y: 0.5,
+      showarrow: false,
+      font: { size: 13, color: '#9ca3af' },
+    }],
+  };
+
+  if (!entries.length) {
+    Plotly.react('chart-ba', [{ type: 'bar', x: [], y: [], marker: { color: [] } }], layoutEmpty, { responsive: true, displayModeBar: false });
+    Plotly.react('chart-spd', [{ type: 'bar', x: [], y: [], marker: { color: [] } }], { ...layoutEmpty, margin: { t: 10, b: 80, l: 50, r: 10 } }, { responsive: true, displayModeBar: false });
+    return;
+  }
+
   // Bar: PCs by BA
   const byBA = {};
-  entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name]||0) + e.items_sold; });
-  const sorted = Object.entries(byBA).sort((a,b)=>b[1]-a[1]).slice(0,14);
-  const bN = sorted.map(([n])=>n);
-  const bV = sorted.map(([,v])=>v);
-  const bC = sorted.map((_,i) => `rgba(5,150,105,${Math.max(0.3, 1-i*0.055)})`);
+  entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name] || 0) + Number(e.items_sold || 0); });
+  const sorted = Object.entries(byBA).sort((a, b) => b[1] - a[1]).slice(0, 14);
+  const bN = sorted.map(([n]) => n);
+  const bV = sorted.map(([, v]) => v);
+  const bC = sorted.map((_, i) => `rgba(5,150,105,${Math.max(0.3, 1 - i * 0.055)})`);
   if (sorted.length) bC[0] = '#059669';
 
-  Plotly.react('chart-ba', [{ type:'bar', x:bN, y:bV, marker:{ color:bC, line:{width:0} },
-    hovertemplate:'<b>%{x}</b><br>%{y} PCs<extra></extra>' }], {
-    paper_bgcolor:'transparent', plot_bgcolor:'#fafafa',
-    margin:{t:10,b:80,l:40,r:10},
-    xaxis:{ tickangle:-40, tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', linecolor:'#e5e7eb' },
-    yaxis:{ tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6' },
-    font:{ family:'-apple-system,sans-serif', color:'#374151' },
-    bargap:0.35,
-  }, { responsive:true, displayModeBar:false });
+  Plotly.react('chart-ba', [{ type: 'bar', x: bN, y: bV, marker: { color: bC, line: { width: 0 } },
+    hovertemplate: '<b>%{x}</b><br>%{y} PCs<extra></extra>' }], {
+    ...layoutBase,
+    margin: { t: 10, b: 80, l: 40, r: 10 },
+    xaxis: { tickangle: -40, tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6', linecolor: '#e5e7eb' },
+    yaxis: { tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6' },
+  }, { responsive: true, displayModeBar: false });
 
-  // Bar: Qty/Day by BA
+  // Bar: Qty/Day by BA — Σ(items_sold) / Σ(working_days) per BA within filtered set (matches table KPI logic)
   const qtyByBA = {}, workByBA = {};
   entries.forEach(e => {
-    qtyByBA[e.ba_name]  = (qtyByBA[e.ba_name]  || 0) + e.items_sold;
-    workByBA[e.ba_name] = (workByBA[e.ba_name]  || 0) + (e.working_days || 1);
+    const ba = e.ba_name;
+    qtyByBA[ba] = (qtyByBA[ba] || 0) + Number(e.items_sold || 0);
+    workByBA[ba] = (workByBA[ba] || 0) + (Number(e.working_days) || 1);
   });
   const spdSorted = Object.keys(qtyByBA)
     .map(n => [n, qtyByBA[n] / workByBA[n]])
-    .sort((a,b) => b[1]-a[1]).slice(0,14);
-  const spdColors = spdSorted.map((_,i) => `rgba(124,58,237,${Math.max(0.3,1-i*0.055)})`);
+    .sort((a, b) => b[1] - a[1]).slice(0, 14);
+  const spdColors = spdSorted.map((_, i) => `rgba(124,58,237,${Math.max(0.3, 1 - i * 0.055)})`);
   if (spdColors.length) spdColors[0] = '#7c3aed';
   Plotly.react('chart-spd', [{
-    type:'bar', x:spdSorted.map(([n])=>n), y:spdSorted.map(([,v])=>v),
-    marker:{color:spdColors, line:{width:0}},
-    hovertemplate:'<b>%{x}</b><br>%{y:.1f} pcs/day<extra></extra>'
+    type: 'bar', x: spdSorted.map(([n]) => n), y: spdSorted.map(([, v]) => v),
+    marker: { color: spdColors, line: { width: 0 } },
+    hovertemplate: '<b>%{x}</b><br>%{y:.1f} pcs/day<extra></extra>'
   }], {
-    paper_bgcolor:'transparent', plot_bgcolor:'#fafafa',
-    margin:{t:10,b:80,l:50,r:10},
-    xaxis:{tickangle:-40, tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6', linecolor:'#e5e7eb'},
-    yaxis:{tickfont:{size:11,color:'#6b7280'}, gridcolor:'#f3f4f6'},
-    font:{family:'-apple-system,sans-serif', color:'#374151'},
-    bargap:0.35,
-  }, {responsive:true, displayModeBar:false});
+    ...layoutBase,
+    margin: { t: 10, b: 80, l: 50, r: 10 },
+    xaxis: { tickangle: -40, tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6', linecolor: '#e5e7eb' },
+    yaxis: { tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6' },
+  }, { responsive: true, displayModeBar: false });
 }
 
 // ── Table ────────────────────────────────────────────────────────
@@ -996,7 +1309,7 @@ function renderTable(entries) {
   });
 
   if (!rows.length) {
-    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
     document.getElementById('tbl-footer').textContent = '';
     return;
   }
@@ -1015,10 +1328,136 @@ function renderTable(entries) {
       <td class="cell-amount">$${fmt(a)}</td>
       <td>${e.items_sold}</td>
       <td>${(e.qpd||0).toFixed(1)}</td>
-      <td>${fmtDate(e.entry_date)}</td>
     </tr>`;
   }).join('');
   document.getElementById('tbl-footer').textContent = `Showing ${rows.length} record${rows.length!==1?'s':''}`;
+}
+
+function dailyRowsForExport() {
+  const ba = (document.getElementById('daily-ba') || {}).value || '';
+  const monthRaw = getGlobalMonthRaw();
+  const team = document.getElementById('f-team').value;
+  const shop = (document.getElementById('global-store') || {}).value || (document.getElementById('f-store') || {}).value || '';
+
+  let salesRows = [...allEntries];
+  let attRows = [...attendanceEntries];
+
+  if (monthRaw) {
+    salesRows = salesRows.filter(e => e.entry_date.slice(0, 7) === monthRaw);
+    attRows = attRows.filter(e => String(e.entry_date).slice(0, 7) === monthRaw);
+  }
+  if (team) {
+    salesRows = salesRows.filter(e => e.team === team);
+    attRows = attRows.filter(e => e.team === team);
+  }
+  if (shop) {
+    salesRows = salesRows.filter(e => (e.store || '') === shop);
+    attRows = attRows.filter(e => (e.store || '') === shop);
+  }
+  if (ba) {
+    salesRows = salesRows.filter(e => e.ba_name === ba);
+    attRows = attRows.filter(e => e.ba_name === ba);
+  }
+
+  const mappedSales = salesRows.map(e => ({
+    kind: 'sales',
+    entry_date: e.entry_date,
+    ba_name: e.ba_name,
+    team: e.team,
+    store: e.store || '',
+    status: 'Worked',
+    sales_amount: Number(e.sales_amount) || 0,
+    items_sold: Number(e.items_sold) || 0,
+    working_days: Number(e.working_days) || 1,
+    qpd: e.qpd != null ? Number(e.qpd) : ((Number(e.items_sold) || 0) / (Number(e.working_days) || 1)),
+    created_at: e.created_at || '',
+  }));
+  const mappedAttendance = attRows.map(e => ({
+    kind: 'attendance',
+    entry_date: String(e.entry_date),
+    ba_name: e.ba_name,
+    team: e.team,
+    store: e.store || '',
+    status: e.status === 'annual_leave' ? 'Annual Leave' : 'Off Day',
+    sales_amount: null,
+    items_sold: null,
+    working_days: null,
+    qpd: null,
+    notes: e.notes || '',
+    created_at: e.created_at || '',
+  }));
+
+  return [...mappedSales, ...mappedAttendance].sort((a, b) => {
+    if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
+    if (a.ba_name !== b.ba_name) return a.ba_name.localeCompare(b.ba_name);
+    return (a.created_at || '') < (b.created_at || '') ? 1 : -1;
+  });
+}
+
+function renderDailySales() {
+  const tbody = document.getElementById('daily-body');
+  const summary = document.getElementById('daily-summary');
+  if (!tbody) return;
+  const rows = dailyRowsForExport();
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">No rows for selected month / shop / filters</td></tr>';
+    if (summary) summary.textContent = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(e => {
+    const qpd = (e.qpd != null) ? (e.qpd) : null;
+    return `<tr>
+      <td>${fmtDate(e.entry_date)}</td>
+      <td class="cell-name"><span class="team-dot t${e.team}"></span>${e.ba_name}</td>
+      <td>${e.team}</td>
+      <td>${e.store || '—'}</td>
+      <td>${e.status}</td>
+      <td class="cell-amount">${e.sales_amount === null ? '—' : ('$' + fmt(+e.sales_amount))}</td>
+      <td>${e.items_sold === null ? '—' : e.items_sold}</td>
+      <td>${qpd === null ? '—' : qpd.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+
+  const salesOnly = rows.filter(r => r.kind === 'sales');
+  const leaves = rows.filter(r => r.kind === 'attendance');
+  const offDays = leaves.filter(r => r.status === 'Off Day').length;
+  const annualLeaves = leaves.filter(r => r.status === 'Annual Leave').length;
+  const totalPcs = salesOnly.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
+  const totalWd = salesOnly.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
+  const avg = totalWd ? (totalPcs / totalWd).toFixed(1) : '0';
+  const ba = (document.getElementById('daily-ba') || {}).value || '';
+  const monthRaw = getGlobalMonthRaw();
+  const monthText = monthRaw ? monthLabel(monthRaw) : 'All Months';
+  if (summary) {
+    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves}`;
+  }
+}
+
+function exportDailySales() {
+  const rows = dailyRowsForExport();
+  if (!rows.length) {
+    alert('No daily rows to export for current filters.');
+    return;
+  }
+  const out = rows.map(e => ({
+    'Date': e.entry_date,
+    'BA': e.ba_name,
+    'Team': e.team,
+    'Shop': e.store || '',
+    'Status': e.status,
+    'Sales ($)': e.sales_amount == null ? '' : +e.sales_amount,
+    'Qty': e.items_sold == null ? '' : e.items_sold,
+    'Working days': e.working_days == null ? '' : e.working_days,
+    'Qty/Day': e.qpd == null ? '' : +e.qpd.toFixed(1),
+    'Notes': e.notes || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(out);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daily BA');
+  const m = getSelectedMonth();
+  const shop = (document.getElementById('global-store') || {}).value || 'all';
+  const ba = (document.getElementById('daily-ba') || {}).value || 'all';
+  XLSX.writeFile(wb, `Daily_BA_Sales_${m}_${shop || 'all'}_${ba || 'all'}.xlsx`);
 }
 
 // ── Heatmap ──────────────────────────────────────────────────────
