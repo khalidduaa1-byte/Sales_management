@@ -612,7 +612,6 @@ let commSortAsc = false;
     buildDaysBadge();
     await loadTeamHeadcount();
     await loadMonthlyTargets();
-    buildMonthFilter();
     await loadAll();
     syncEditorMonthWithGlobal();
     setMainTab('performance');
@@ -645,20 +644,15 @@ function buildDaysBadge() {
 function buildMonthFilter() {
   const now = new Date();
   const cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const allMonths = new Set([cur]);
+  Object.keys(TARGETS).forEach(m => allMonths.add(m));
+  Object.keys(dynamicTargets).forEach(m => allMonths.add(m));
+  allEntries.forEach(e => allMonths.add(e.entry_date.slice(0, 7)));
+  attendanceEntries.forEach(e => allMonths.add(String(e.entry_date).slice(0, 7)));
   const opts = [
-    { v: '',        l: 'All Months' },
-    { v: '2026-01', l: 'Jan 2026' },
-    { v: '2026-02', l: 'Feb 2026' },
-    { v: '2026-03', l: 'Mar 2026' },
-    { v: '2026-04', l: 'Apr 2026' },
+    { v: '', l: 'All Months' },
+    ...[...allMonths].filter(Boolean).sort().map(m => ({ v: m, l: monthLabel(m) })),
   ];
-  if (!opts.find(o => o.v === cur) && cur) {
-    opts.push({ v: cur, l: now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) });
-  }
-  const extraMonths = [...new Set([...Object.keys(TARGETS), ...Object.keys(dynamicTargets), ...allEntries.map(e => e.entry_date.slice(0, 7))])];
-  extraMonths.forEach(m => {
-    if (m && !opts.find(o => o.v === m)) opts.push({ v: m, l: monthLabel(m) });
-  });
   opts.sort((a, b) => a.v.localeCompare(b.v));
   const sel = document.getElementById('global-month');
   const hadInit = sel.dataset.monthReady === '1';
@@ -1123,8 +1117,9 @@ function computeCommissionRows() {
   monthEntries.forEach(e => {
     const sales = Number(e.sales_amount) || 0;
     byTeam[e.team] = (byTeam[e.team] || 0) + sales;
-    if (!byBA[e.ba_name]) byBA[e.ba_name] = { ba_name: e.ba_name, team: e.team, sales: 0 };
-    byBA[e.ba_name].sales += sales;
+    const baKey = `${e.ba_name}|${e.team}`;
+    if (!byBA[baKey]) byBA[baKey] = { ba_name: e.ba_name, team: e.team, sales: 0 };
+    byBA[baKey].sales += sales;
   });
 
   const teamAttainment = {};

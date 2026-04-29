@@ -622,7 +622,7 @@ async function updateStats() {
 
   document.getElementById('stat-month-sales').textContent = '$' + totalSales.toLocaleString('en-US', {maximumFractionDigits:0});
   document.getElementById('stat-month-items').textContent = totalItems;
-  document.getElementById('stat-shifts').textContent      = entries.length;
+  document.getElementById('stat-shifts').textContent      = new Set(entries.map(e => e.entry_date)).size;
 }
 
 // ── Sign out ──────────────────────────────────────────────────────

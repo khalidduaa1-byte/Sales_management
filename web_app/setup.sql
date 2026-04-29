@@ -56,7 +56,7 @@ create table if not exists public.ba_attendance_entries (
   team        text not null,
   store       text,
   entry_date  date not null,
-  status      text not null check (status in ('off_day', 'annual_leave')),
+  status      text not null check (status in ('off_day', 'annual_leave', 'other')),
   notes       text,
   created_at  timestamptz default now(),
   unique (ba_id, entry_date)
@@ -96,6 +96,9 @@ create unique index if not exists sales_entries_unique_name_date_store_shift_whe
 
 alter table public.monthly_targets enable row level security;
 alter table public.ba_attendance_entries enable row level security;
+alter table public.ba_attendance_entries drop constraint if exists ba_attendance_entries_status_check;
+alter table public.ba_attendance_entries add constraint ba_attendance_entries_status_check
+  check (status in ('off_day', 'annual_leave', 'other'));
 
 -- ── Row Level Security (RLS) ─────────────────────────────────────
 -- RLS means: users can only see/edit data they're allowed to.
@@ -185,6 +188,19 @@ create policy "BAs can update own attendance"
 create policy "Managers can read all attendance"
   on public.ba_attendance_entries for select
   using (public.is_manager());
+
+-- ── Auto-update updated_at on monthly_targets ────────────────────
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create or replace trigger monthly_targets_updated_at
+  before update on public.monthly_targets
+  for each row execute procedure public.set_updated_at();
 
 -- ── Auto-create profile on signup ────────────────────────────────
 -- This is a "trigger" — it fires automatically when someone signs up.
