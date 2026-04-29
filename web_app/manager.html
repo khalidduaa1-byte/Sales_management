@@ -269,6 +269,33 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   font-size: 11px;
   color: #6b7280;
 }
+.top-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.page-tabs {
+  display: flex;
+  gap: 8px;
+}
+.page-tab-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.page-tab-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
 </style>
 </head>
 <body>
@@ -300,27 +327,34 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
 </header>
 
 <main>
+  <div class="top-controls">
+    <div class="page-tabs">
+      <button class="page-tab-btn active" id="tab-performance" onclick="setMainTab('performance')">Performance Review</button>
+      <button class="page-tab-btn" id="tab-targets" onclick="setMainTab('targets')">Targets & Commissions</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="sec-lbl" style="margin:0">Month</span>
+      <select class="f-sel" id="global-month" onchange="applyFilters()" style="min-width:150px"></select>
+    </div>
+  </div>
 
   <!-- KPIs -->
-  <div class="sec-lbl">Today's Performance</div>
-  <div class="kpi-grid" id="kpi-grid">
+  <div class="sec-lbl perf-section">Today's Performance</div>
+  <div class="kpi-grid perf-section" id="kpi-grid">
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-val" id="kv0">—</div><div class="kpi-lbl">Today's Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon green"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-val" id="kv1">—</div><div class="kpi-lbl">Monthly Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div><div class="kpi-val" id="kv2">—</div><div class="kpi-lbl">Total PCs Sold</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="kpi-val" id="kv3">—</div><div class="kpi-lbl">Avg PCs / BA</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon pink"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div></div><div class="kpi-val" id="kv4" style="font-size:15px">—</div><div class="kpi-lbl">Top Performer</div></div>
-    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div></div><div class="kpi-val" id="kv5">—</div><div class="kpi-lbl">Active Teams</div></div>
+    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div></div><div class="kpi-val" id="kv5">—</div><div class="kpi-lbl">Active BAs</div></div>
   </div>
 
   <!-- Team Targets -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+  <div class="target-section" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
     <div class="sec-lbl" style="margin:0">Monthly Team Targets</div>
     <span id="days-badge" style="font-size:11px;padding:3px 10px;border-radius:99px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:600"></span>
-    <select class="f-sel" id="t-month" onchange="onTargetMonthChange()" style="min-width:140px">
-      <option value="">Select month</option>
-    </select>
   </div>
-  <div class="filter-card" style="margin-bottom:14px">
+  <div class="filter-card target-section" style="margin-bottom:14px">
     <div class="filter-row">
       <input type="month" class="f-date" id="target-month" title="Target month"/>
       <select class="f-sel" id="target-team">
@@ -335,13 +369,13 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <span id="target-msg" style="font-size:12px;color:#6b7280"></span>
     </div>
   </div>
-  <div class="target-grid" id="target-grid">
+  <div class="target-grid target-section" id="target-grid">
     <div style="color:#9ca3af;padding:20px">Loading…</div>
   </div>
 
   <!-- Commission -->
-  <div class="sec-lbl">Monthly Commission</div>
-  <div class="comm-card">
+  <div class="sec-lbl target-section">Monthly Commission</div>
+  <div class="comm-card target-section">
     <div class="comm-top">
       <div>
         <div class="comm-total" id="comm-total">$0</div>
@@ -356,22 +390,21 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
           <th>Team</th>
           <th>Month</th>
           <th>Sales</th>
-          <th>Target Basis</th>
+          <th>Target</th>
           <th>Attainment</th>
           <th>Rate</th>
           <th>Commission</th>
-          <th>Rule</th>
         </tr></thead>
         <tbody id="comm-body">
-          <tr><td colspan="9" style="text-align:center;padding:24px;color:#9ca3af">Loading…</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:24px;color:#9ca3af">Loading…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <!-- Charts -->
-  <div class="sec-lbl">Performance Analytics</div>
-  <div class="charts-row">
+  <div class="sec-lbl perf-section">Performance Analytics</div>
+  <div class="charts-row perf-section">
     <div class="chart-card">
       <div class="chart-title">PCs Sold by Beauty Advisor</div>
       <div id="chart-ba" style="height:300px"></div>
@@ -383,7 +416,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   </div>
 
   <!-- Table section -->
-  <div class="tbl-header">
+  <div class="tbl-header perf-section">
     <div class="sec-lbl" style="margin:0">BA Performance — All Entries</div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-reset" onclick="exportToExcel()">↓ Export Excel</button>
@@ -395,13 +428,12 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   </div>
 
   <!-- Filters -->
-  <div class="filter-card">
+  <div class="filter-card perf-section">
     <div class="filter-row">
       <select class="f-sel" id="f-team"  onchange="applyFilters()">
         <option value="">All Teams</option>
         <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
       </select>
-      <select class="f-sel" id="f-month" onchange="applyFilters()"></select>
       <select class="f-sel" id="f-ba"    onchange="applyFilters()">
         <option value="">All BAs</option>
       </select>
@@ -412,7 +444,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   </div>
 
   <!-- Table view -->
-  <div class="table-card" id="view-table">
+  <div class="table-card perf-section" id="view-table">
     <div class="tbl-wrap">
       <table>
         <thead><tr>
@@ -433,7 +465,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   </div>
 
   <!-- Heatmap view -->
-  <div class="table-card" id="view-heatmap" style="display:none">
+  <div class="table-card perf-section" id="view-heatmap" style="display:none">
     <div class="hmap-wrap" id="hmap-body">
       <p style="color:#9ca3af">Loading…</p>
     </div>
@@ -480,6 +512,8 @@ let dynamicTargets = {};
 const TEAMS = ['Cairo', 'Sharm', 'Hurgadah'];
 let lastCommissionRows = [];
 let dedupeDropped = 0;
+let teamHeadcount = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
+let mainTab = 'performance';
 
 // ── Auth ─────────────────────────────────────────────────────────
 (async () => {
@@ -496,10 +530,12 @@ let dedupeDropped = 0;
     document.getElementById('manager-name').textContent = profile.name || 'Manager';
     buildMonthFilter();
     buildDaysBadge();
+    await loadTeamHeadcount();
     await loadMonthlyTargets();
-    buildTargetMonthSelector();
+    buildMonthFilter();
     await loadAll();
-    syncTargetMonthWithFilter();
+    syncEditorMonthWithGlobal();
+    setMainTab('performance');
     startAutoRefresh();
   } catch (err) {
     showPageError(err?.message || 'Failed to initialize dashboard.');
@@ -529,8 +565,14 @@ function buildMonthFilter() {
   if (!opts.find(o => o.v === cur) && cur) {
     opts.push({ v: cur, l: now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) });
   }
-  const sel = document.getElementById('f-month');
-  sel.innerHTML = opts.map(o => `<option value="${o.v}"${o.v === cur ? ' selected' : ''}>${o.l}</option>`).join('');
+  const extraMonths = [...new Set([...Object.keys(TARGETS), ...Object.keys(dynamicTargets), ...allEntries.map(e => e.entry_date.slice(0, 7))])];
+  extraMonths.forEach(m => {
+    if (m && !opts.find(o => o.v === m)) opts.push({ v: m, l: monthLabel(m) });
+  });
+  opts.sort((a, b) => a.v.localeCompare(b.v));
+  const sel = document.getElementById('global-month');
+  const current = sel.value || cur;
+  sel.innerHTML = opts.map(o => `<option value="${o.v}"${o.v === current ? ' selected' : ''}>${o.l}</option>`).join('');
 }
 
 function monthLabel(monthKey) {
@@ -545,33 +587,35 @@ function getCurrentMonthKey() {
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 }
 
-function getTargetMonth() {
-  return document.getElementById('t-month').value || document.getElementById('f-month').value || getCurrentMonthKey();
+function getSelectedMonth() {
+  return document.getElementById('global-month').value || getCurrentMonthKey();
 }
 
-function onTargetMonthChange() {
-  const tMonth = document.getElementById('t-month').value;
+function syncEditorMonthWithGlobal() {
   const editorMonth = document.getElementById('target-month');
-  if (editorMonth) editorMonth.value = tMonth;
-  renderTargets(filtered());
+  if (editorMonth && !editorMonth.value) editorMonth.value = getSelectedMonth();
 }
 
-function syncTargetMonthWithFilter() {
-  const fMonth = document.getElementById('f-month').value;
-  const tMonth = document.getElementById('t-month');
-  if (fMonth) tMonth.value = fMonth;
-  if (!tMonth.value) tMonth.value = getCurrentMonthKey();
-  const editorMonth = document.getElementById('target-month');
-  if (editorMonth && !editorMonth.value) editorMonth.value = tMonth.value;
+function setMainTab(tab) {
+  mainTab = tab;
+  document.querySelectorAll('.perf-section').forEach(el => {
+    el.style.display = tab === 'performance' ? '' : 'none';
+  });
+  document.querySelectorAll('.target-section').forEach(el => {
+    el.style.display = tab === 'targets' ? '' : 'none';
+  });
+  document.getElementById('tab-performance').classList.toggle('active', tab === 'performance');
+  document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
 }
 
-function buildTargetMonthSelector() {
-  const monthsFromEntries = [...new Set(allEntries.map(e => e.entry_date.slice(0, 7)))];
-  const monthsFromTargets = [...new Set([...Object.keys(TARGETS), ...Object.keys(dynamicTargets)])];
-  const allMonths = [...new Set([...monthsFromEntries, ...monthsFromTargets, getCurrentMonthKey()])].sort();
-  const tMonth = document.getElementById('t-month');
-  tMonth.innerHTML = allMonths.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
-  if (!tMonth.value || !allMonths.includes(tMonth.value)) tMonth.value = getTargetMonth();
+async function loadTeamHeadcount() {
+  const { data, error } = await sb.from('profiles').select('team, role').eq('role', 'ba');
+  if (error) return;
+  const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
+  (data || []).forEach(p => {
+    if (counts[p.team] !== undefined) counts[p.team] += 1;
+  });
+  teamHeadcount = counts;
 }
 
 async function loadMonthlyTargets() {
@@ -593,11 +637,11 @@ function getTargetConfig(month, team) {
   return dynamicTargets[month]?.[team] || TARGETS[month]?.[team] || null;
 }
 
-function getTeamMonthlyTarget(month, team, activeBas) {
+function getTeamMonthlyTarget(month, team, teamSize) {
   const cfg = getTargetConfig(month, team);
   if (!cfg) return null;
   if (cfg.type === 'team_total') return cfg.value;
-  return cfg.value * activeBas;
+  return cfg.value * teamSize;
 }
 
 function commissionRateFromPct(pct) {
@@ -623,34 +667,11 @@ async function loadAll() {
     working_days: e.working_days || 1,
     qpd: e.items_sold / (e.working_days || 1),
   }));
-  const seen = new Set();
-  const seenLoose = new Set();
-  const deduped = [];
-  for (const e of rawEntries) {
-    const keyStrict = [
-      e.ba_name || '',
-      e.team || '',
-      e.store || '',
-      e.entry_date || '',
-      Number(e.sales_amount || 0).toFixed(2),
-      Number(e.items_sold || 0),
-      Number(e.working_days || 1),
-      e.shift || '',
-    ].join('|');
-    const keyLoose = [
-      e.ba_name || '',
-      e.team || '',
-      e.entry_date || '',
-      Number(e.sales_amount || 0).toFixed(2),
-      Number(e.items_sold || 0),
-    ].join('|');
-    if (seen.has(keyStrict) || seenLoose.has(keyLoose)) continue;
-    seen.add(keyStrict);
-    seenLoose.add(keyLoose);
-    deduped.push(e);
-  }
-  dedupeDropped = rawEntries.length - deduped.length;
-  allEntries = deduped;
+  // Keep raw rows for accurate qty/day and KPI calculations.
+  // Duplicates should be cleaned at source (database) instead of being
+  // silently dropped in the UI.
+  dedupeDropped = 0;
+  allEntries = rawEntries;
 
   // Populate BA filter
   const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
@@ -659,7 +680,7 @@ async function loadAll() {
 
   lastUpdated = new Date();
   updateLiveBadge();
-  buildTargetMonthSelector();
+  buildMonthFilter();
   applyFilters();
 }
 
@@ -675,26 +696,18 @@ function showPageError(msg) {
   }
   const commBody = document.getElementById('comm-body');
   if (commBody) {
-    commBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    commBody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
   }
 }
 
 function renderDedupeInfo() {
-  const targetMsg = document.getElementById('target-msg');
-  if (!targetMsg) return;
-  if (dedupeDropped > 0) {
-    targetMsg.style.color = '#b45309';
-    targetMsg.textContent = `Ignored ${dedupeDropped} duplicate row(s) from sales data source.`;
-  } else if (!targetMsg.textContent || targetMsg.style.color === 'rgb(180, 83, 9)') {
-    targetMsg.style.color = '#6b7280';
-    targetMsg.textContent = '';
-  }
+  // Intentionally no-op: we don't show duplicate warnings in UI.
 }
 
 // ── Filters ──────────────────────────────────────────────────────
 function filtered() {
   const team  = document.getElementById('f-team').value;
-  const month = document.getElementById('f-month').value;
+  const month = getSelectedMonth();
   const ba    = document.getElementById('f-ba').value;
   const start = document.getElementById('f-start').value;
   const end   = document.getElementById('f-end').value;
@@ -709,7 +722,7 @@ function filtered() {
 }
 
 function applyFilters() {
-  syncTargetMonthWithFilter();
+  syncEditorMonthWithGlobal();
   const e = filtered();
   renderDedupeInfo();
   renderKPIs(e);
@@ -722,8 +735,7 @@ function applyFilters() {
 
 function resetFilters() {
   ['f-team','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
-  buildMonthFilter();
-  syncTargetMonthWithFilter();
+  syncEditorMonthWithGlobal();
   applyFilters();
 }
 
@@ -733,24 +745,23 @@ function renderKPIs(entries) {
   const todaySales = entries.filter(e => e.entry_date === today).reduce((s,e) => s + +e.sales_amount, 0);
   const mthSales   = entries.reduce((s,e) => s + +e.sales_amount, 0);
   const totalPcs   = entries.reduce((s,e) => s + e.items_sold, 0);
-  const bas        = new Set(entries.map(e => e.ba_id));
+  const bas        = new Set(entries.map(e => e.ba_name));
   const avgPcs     = bas.size ? (totalPcs / bas.size).toFixed(1) : '0';
   const byBA       = {};
   entries.forEach(e => { byBA[e.ba_name] = (byBA[e.ba_name]||0) + +e.sales_amount; });
   const top        = Object.entries(byBA).sort((a,b) => b[1]-a[1])[0];
-  const teams      = new Set(entries.map(e => e.team));
 
   setText('kv0', '$' + fmt(todaySales));
   setText('kv1', '$' + fmt(mthSales));
   setText('kv2', totalPcs.toLocaleString());
   setText('kv3', avgPcs);
   setText('kv4', top ? top[0] : '—');
-  setText('kv5', teams.size);
+  setText('kv5', bas.size);
 }
 
 // ── Team targets ─────────────────────────────────────────────────
 function renderTargets(entries) {
-  const month = getTargetMonth();
+  const month = getSelectedMonth();
   const now   = new Date();
   const last  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const dLeft = last - now.getDate();
@@ -762,13 +773,15 @@ function renderTargets(entries) {
     const te      = monthEntries.filter(e => e.team === team);
     const sales   = te.reduce((s,e) => s + +e.sales_amount, 0);
     const pcs     = te.reduce((s,e) => s + e.items_sold, 0);
-    const uniqBAs = new Set(te.map(e => e.ba_id)).size;
-    const tgt     = getTeamMonthlyTarget(month, team, uniqBAs);
+    const uniqBAs = new Set(te.map(e => e.ba_name)).size;
+    const teamSize = Math.max(teamHeadcount[team] || 0, uniqBAs);
+    const tgt     = getTeamMonthlyTarget(month, team, teamSize);
     const pct     = tgt ? (sales / tgt) * 100 : 0;
     const rem     = tgt ? Math.max(0, tgt - sales) : null;
     const dailyNeed = rem && dLeft > 0 ? rem / dLeft : 0;
-    const avg7    = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + +e.sales_amount, 0) / 7;
-    const onTrack = tgt ? avg7 >= dailyNeed : true;
+    const avg7Sales = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + +e.sales_amount, 0) / 7;
+    const avg7Qty   = te.filter(e => e.entry_date >= sevenKey).reduce((s,e) => s + (Number(e.items_sold) || 0), 0) / 7;
+    const onTrack = tgt ? avg7Sales >= dailyNeed : true;
 
     const barGrad = pct >= 95 ? 'linear-gradient(90deg,#059669,#10b981)'
                   : pct >= 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)'
@@ -792,7 +805,7 @@ function renderTargets(entries) {
       <div class="target-stats">
         <div><div class="ts-lbl">Remaining</div><div class="ts-val">${rem !== null ? '$'+(rem/1000).toFixed(1)+'k' : '—'}</div></div>
         <div><div class="ts-lbl">Daily needed</div><div class="ts-val">${dailyNeed > 0 ? '$'+(dailyNeed/1000).toFixed(1)+'k' : '—'}</div></div>
-        <div><div class="ts-lbl">7-day avg/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">$${(avg7/1000).toFixed(1)}k</div></div>
+        <div><div class="ts-lbl">7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">${avg7Qty.toFixed(1)} pcs</div></div>
       </div>
     </div>`;
   }).join('');
@@ -824,13 +837,13 @@ async function saveTarget() {
   msgEl.style.color = '#059669';
   msgEl.textContent = `Saved ${team} target for ${monthLabel(month)}.`;
   await loadMonthlyTargets();
-  buildTargetMonthSelector();
-  document.getElementById('t-month').value = month;
+  buildMonthFilter();
+  document.getElementById('global-month').value = month;
   applyFilters();
 }
 
 function computeCommissionRows() {
-  const month = getTargetMonth();
+  const month = getSelectedMonth();
   const monthEntries = allEntries.filter(e => e.entry_date.slice(0, 7) === month);
   const byTeam = {};
   const byBA = {};
@@ -845,7 +858,7 @@ function computeCommissionRows() {
   const teamRates = {};
   TEAMS.forEach(team => {
     const teamRows = Object.values(byBA).filter(r => r.team === team);
-    const activeBas = teamRows.length;
+    const activeBas = Math.max(teamHeadcount[team] || 0, teamRows.length);
     const target = getTeamMonthlyTarget(month, team, activeBas);
     const teamSales = byTeam[team] || 0;
     const pct = target ? (teamSales / target) * 100 : 0;
@@ -858,26 +871,19 @@ function computeCommissionRows() {
     .map(row => {
       const cfg = getTargetConfig(month, row.team);
       let rate = 0;
-      let basis = 'No target configured';
+      let basis = '—';
       let attainment = 0;
-      let rule = 'No commission (missing target)';
 
       if (cfg?.type === 'team_total') {
         const t = teamAttainment[row.team];
         attainment = t?.pct || 0;
         rate = teamRates[row.team] || 0;
-        basis = `Team target $${fmt(t?.target || 0)}`;
-        rule = rate > 0
-          ? 'Hurghada-style team gate passed'
-          : 'Team below 70%: no commission';
+        basis = `$${fmt(t?.target || 0)}`;
       } else if (cfg?.type === 'per_ba') {
         const baTarget = cfg.value;
         attainment = baTarget ? (row.sales / baTarget) * 100 : 0;
         rate = commissionRateFromPct(attainment);
-        basis = `Per BA target $${fmt(baTarget)}`;
-        rule = rate > 0
-          ? 'Per-BA slab applied'
-          : 'BA below 70%: no commission';
+        basis = `$${fmt(baTarget)}`;
       }
 
       const commission = row.sales * rate;
@@ -890,7 +896,6 @@ function computeCommissionRows() {
         attainment,
         rate,
         commission,
-        rule,
       };
     });
 }
@@ -900,14 +905,14 @@ function renderCommissions() {
   lastCommissionRows = rows;
   const tbody = document.getElementById('comm-body');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:#9ca3af">No entries for selected month</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#9ca3af">No entries for selected month</td></tr>';
     setText('comm-total', '$0');
-    setText('comm-sub', `No commission rows for ${monthLabel(getTargetMonth())}.`);
+    setText('comm-sub', `No commission rows for ${monthLabel(getSelectedMonth())}.`);
     return;
   }
   const total = rows.reduce((s, r) => s + r.commission, 0);
   setText('comm-total', '$' + fmt(total));
-  setText('comm-sub', `Commission month: ${monthLabel(getTargetMonth())} • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
+  setText('comm-sub', `Commission month: ${monthLabel(getSelectedMonth())} • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
 
   tbody.innerHTML = rows.map(r => {
     const pct = r.attainment.toFixed(1) + '%';
@@ -921,7 +926,6 @@ function renderCommissions() {
       <td>${pct}</td>
       <td>${ratePct}</td>
       <td class="cell-amount">$${fmt(r.commission)}</td>
-      <td>${r.rule}</td>
     </tr>`;
   }).join('');
 }
@@ -1029,7 +1033,7 @@ function renderHeatmap(entries) {
     if (!baMap[e.ba_name]) baMap[e.ba_name] = {Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0,Sun:0};
     baMap[e.ba_name][dn] += e.items_sold;
   });
-  const baList = Object.keys(baMap);
+  const baList = Object.keys(baMap).sort((a, b) => a.localeCompare(b));
   if (!baList.length) { document.getElementById('hmap-body').innerHTML='<p style="color:#9ca3af;padding:20px">No data</p>'; return; }
   const all = baList.flatMap(b => DAYS.map(d => baMap[b][d]));
   const max = Math.max(...all)||1;
@@ -1094,16 +1098,15 @@ function exportToExcel() {
       'Team': r.team,
       'Month': monthLabel(r.month),
       'Sales ($)': +r.sales.toFixed(2),
-      'Target Basis': r.basis,
+      'Target': r.basis,
       'Attainment (%)': +r.attainment.toFixed(2),
       'Rate (%)': +(r.rate * 100).toFixed(2),
       'Commission ($)': +r.commission.toFixed(2),
-      'Rule': r.rule,
     }));
     const ws2 = XLSX.utils.json_to_sheet(commRows);
     XLSX.utils.book_append_sheet(wb, ws2, 'Commissions');
   }
-  const month = document.getElementById('f-month').value;
+  const month = getSelectedMonth();
   XLSX.writeFile(wb, `BA_Sales${month ? '_' + month : ''}.xlsx`);
 }
 
@@ -1117,16 +1120,15 @@ function exportCommissions() {
     'Team': r.team,
     'Month': monthLabel(r.month),
     'Sales ($)': +r.sales.toFixed(2),
-    'Target Basis': r.basis,
+    'Target': r.basis,
     'Attainment (%)': +r.attainment.toFixed(2),
     'Rate (%)': +(r.rate * 100).toFixed(2),
     'Commission ($)': +r.commission.toFixed(2),
-    'Rule': r.rule,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Commissions');
-  XLSX.writeFile(wb, `BA_Commissions_${getTargetMonth()}.xlsx`);
+  XLSX.writeFile(wb, `BA_Commissions_${getSelectedMonth()}.xlsx`);
 }
 
 // ── Sign out ─────────────────────────────────────────────────────
