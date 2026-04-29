@@ -52,6 +52,15 @@ header {
   50%      { opacity: .5; transform: scale(1.35); }
 }
 .live-text { font-size: 11px; color: #6b7280; }
+.build-tag {
+  font-size: 10px;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 8px;
+}
 .header-right { display: flex; align-items: center; gap: 10px; }
 .manager-chip {
   display: flex; align-items: center; gap: 8px;
@@ -233,6 +242,33 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
 .hmap { border-collapse: separate; border-spacing: 4px; }
 .hmap th { font-size: 11px; color: #6b7280; font-weight: 600; text-align: center; min-width: 55px; padding: 4px; }
 .hmap td { text-align: center; border-radius: 6px; font-size: 11px; font-weight: 600; padding: 8px 6px; }
+
+/* ── Commission ── */
+.comm-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.comm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.comm-total {
+  font-size: 20px;
+  font-weight: 800;
+  color: #111827;
+}
+.comm-note {
+  font-size: 11px;
+  color: #6b7280;
+}
 </style>
 </head>
 <body>
@@ -249,6 +285,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
         <div class="live-badge">
           <div class="live-dot"></div>
           <span class="live-text" id="live-text">Live updates • Last updated just now</span>
+          <span class="build-tag">build 2026-04-29-2</span>
         </div>
       </div>
     </div>
@@ -276,12 +313,60 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   </div>
 
   <!-- Team Targets -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
     <div class="sec-lbl" style="margin:0">Monthly Team Targets</div>
     <span id="days-badge" style="font-size:11px;padding:3px 10px;border-radius:99px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:600"></span>
+    <select class="f-sel" id="t-month" onchange="onTargetMonthChange()" style="min-width:140px">
+      <option value="">Select month</option>
+    </select>
+  </div>
+  <div class="filter-card" style="margin-bottom:14px">
+    <div class="filter-row">
+      <input type="month" class="f-date" id="target-month" title="Target month"/>
+      <select class="f-sel" id="target-team">
+        <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
+      </select>
+      <select class="f-sel" id="target-type">
+        <option value="per_ba">Per BA target</option>
+        <option value="team_total">Team total target</option>
+      </select>
+      <input type="number" class="f-date" id="target-value" min="0" step="0.01" placeholder="Target amount"/>
+      <button class="btn-reset" onclick="saveTarget()">Save Target</button>
+      <span id="target-msg" style="font-size:12px;color:#6b7280"></span>
+    </div>
   </div>
   <div class="target-grid" id="target-grid">
     <div style="color:#9ca3af;padding:20px">Loading…</div>
+  </div>
+
+  <!-- Commission -->
+  <div class="sec-lbl">Monthly Commission</div>
+  <div class="comm-card">
+    <div class="comm-top">
+      <div>
+        <div class="comm-total" id="comm-total">$0</div>
+        <div class="comm-note" id="comm-sub">Calculated from target attainment slabs for selected target month.</div>
+      </div>
+      <button class="btn-reset" onclick="exportCommissions()">↓ Export Commissions</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>BA Name</th>
+          <th>Team</th>
+          <th>Month</th>
+          <th>Sales</th>
+          <th>Target Basis</th>
+          <th>Attainment</th>
+          <th>Rate</th>
+          <th>Commission</th>
+          <th>Rule</th>
+        </tr></thead>
+        <tbody id="comm-body">
+          <tr><td colspan="9" style="text-align:center;padding:24px;color:#9ca3af">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- Charts -->
@@ -364,10 +449,26 @@ const sb = createClient(
 );
 
 const TARGETS = {
-  "2026-01": { Cairo: 11000, Sharm: 18000, Hurgadah: 15000 },
-  "2026-02": { Cairo:  9000, Sharm: 13333, Hurgadah: 10000 },
-  "2026-03": { Cairo:  9000, Sharm: 13333, Hurgadah: 10000 },
-  "2026-04": { Cairo:  9500, Sharm: 17000, Hurgadah: 13333 },
+  "2026-01": {
+    Cairo: { type: "per_ba", value: 11000 },
+    Sharm: { type: "per_ba", value: 18000 },
+    Hurgadah: { type: "team_total", value: 45000 },
+  },
+  "2026-02": {
+    Cairo: { type: "per_ba", value: 9000 },
+    Sharm: { type: "per_ba", value: 13333 },
+    Hurgadah: { type: "team_total", value: 30000 },
+  },
+  "2026-03": {
+    Cairo: { type: "per_ba", value: 9000 },
+    Sharm: { type: "per_ba", value: 13333 },
+    Hurgadah: { type: "team_total", value: 30000 },
+  },
+  "2026-04": {
+    Cairo: { type: "per_ba", value: 9500 },
+    Sharm: { type: "per_ba", value: 17000 },
+    Hurgadah: { type: "team_total", value: 40000 },
+  },
 };
 const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
 
@@ -375,23 +476,34 @@ let allEntries = [];
 let sortCol = 'sales_amount', sortAsc = false;
 let viewMode = 'table';
 let lastUpdated = new Date();
+let dynamicTargets = {};
+const TEAMS = ['Cairo', 'Sharm', 'Hurgadah'];
+let lastCommissionRows = [];
+let dedupeDropped = 0;
 
 // ── Auth ─────────────────────────────────────────────────────────
 (async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
 
-  const { data: profile, error: pErr } = await sb.from('profiles')
-    .select('name,role').eq('id', session.user.id).single();
-  if (pErr || !profile) { await sb.auth.signOut(); window.location.href = 'index.html?error=setup'; return; }
-  if (profile.role === 'ba')       { window.location.href = 'ba.html'; return; }
-  if (profile.role !== 'manager')  { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+    const { data: profile, error: pErr } = await sb.from('profiles')
+      .select('name,role').eq('id', session.user.id).single();
+    if (pErr || !profile) { await sb.auth.signOut(); window.location.href = 'index.html?error=setup'; return; }
+    if (profile.role === 'ba')       { window.location.href = 'ba.html'; return; }
+    if (profile.role !== 'manager')  { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
 
-  document.getElementById('manager-name').textContent = profile.name || 'Manager';
-  buildMonthFilter();
-  buildDaysBadge();
-  await loadAll();
-  startAutoRefresh();
+    document.getElementById('manager-name').textContent = profile.name || 'Manager';
+    buildMonthFilter();
+    buildDaysBadge();
+    await loadMonthlyTargets();
+    buildTargetMonthSelector();
+    await loadAll();
+    syncTargetMonthWithFilter();
+    startAutoRefresh();
+  } catch (err) {
+    showPageError(err?.message || 'Failed to initialize dashboard.');
+  }
 })();
 
 // ── Days remaining ───────────────────────────────────────────────
@@ -421,15 +533,124 @@ function buildMonthFilter() {
   sel.innerHTML = opts.map(o => `<option value="${o.v}"${o.v === cur ? ' selected' : ''}>${o.l}</option>`).join('');
 }
 
+function monthLabel(monthKey) {
+  if (!monthKey) return 'Unknown';
+  const [year, month] = monthKey.split('-');
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function getTargetMonth() {
+  return document.getElementById('t-month').value || document.getElementById('f-month').value || getCurrentMonthKey();
+}
+
+function onTargetMonthChange() {
+  const tMonth = document.getElementById('t-month').value;
+  const editorMonth = document.getElementById('target-month');
+  if (editorMonth) editorMonth.value = tMonth;
+  renderTargets(filtered());
+}
+
+function syncTargetMonthWithFilter() {
+  const fMonth = document.getElementById('f-month').value;
+  const tMonth = document.getElementById('t-month');
+  if (fMonth) tMonth.value = fMonth;
+  if (!tMonth.value) tMonth.value = getCurrentMonthKey();
+  const editorMonth = document.getElementById('target-month');
+  if (editorMonth && !editorMonth.value) editorMonth.value = tMonth.value;
+}
+
+function buildTargetMonthSelector() {
+  const monthsFromEntries = [...new Set(allEntries.map(e => e.entry_date.slice(0, 7)))];
+  const monthsFromTargets = [...new Set([...Object.keys(TARGETS), ...Object.keys(dynamicTargets)])];
+  const allMonths = [...new Set([...monthsFromEntries, ...monthsFromTargets, getCurrentMonthKey()])].sort();
+  const tMonth = document.getElementById('t-month');
+  tMonth.innerHTML = allMonths.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  if (!tMonth.value || !allMonths.includes(tMonth.value)) tMonth.value = getTargetMonth();
+}
+
+async function loadMonthlyTargets() {
+  const { data, error } = await sb.from('monthly_targets').select('month_key,team,target_type,target_value');
+  if (error) {
+    console.warn('monthly_targets not available yet:', error.message);
+    dynamicTargets = {};
+    return;
+  }
+  const byMonth = {};
+  (data || []).forEach(r => {
+    if (!byMonth[r.month_key]) byMonth[r.month_key] = {};
+    byMonth[r.month_key][r.team] = { type: r.target_type, value: Number(r.target_value) };
+  });
+  dynamicTargets = byMonth;
+}
+
+function getTargetConfig(month, team) {
+  return dynamicTargets[month]?.[team] || TARGETS[month]?.[team] || null;
+}
+
+function getTeamMonthlyTarget(month, team, activeBas) {
+  const cfg = getTargetConfig(month, team);
+  if (!cfg) return null;
+  if (cfg.type === 'team_total') return cfg.value;
+  return cfg.value * activeBas;
+}
+
+function commissionRateFromPct(pct) {
+  if (pct >= 100) return 0.013;
+  if (pct >= 90) return 0.011;
+  if (pct >= 80) return 0.01;
+  if (pct >= 70) return 0.008;
+  return 0;
+}
+
 // ── Load all entries ─────────────────────────────────────────────
 async function loadAll() {
   const { data, error } = await sb.from('sales_entries').select('*').order('entry_date', { ascending: false });
-  if (error) { console.error(error); return; }
-  allEntries = (data || []).map(e => ({
+  if (error) {
+    console.error(error);
+    allEntries = [];
+    showPageError('Could not load sales_entries. Please run setup.sql and refresh.');
+    applyFilters();
+    return;
+  }
+  const rawEntries = (data || []).map(e => ({
     ...e,
     working_days: e.working_days || 1,
     qpd: e.items_sold / (e.working_days || 1),
   }));
+  const seen = new Set();
+  const seenLoose = new Set();
+  const deduped = [];
+  for (const e of rawEntries) {
+    const keyStrict = [
+      e.ba_name || '',
+      e.team || '',
+      e.store || '',
+      e.entry_date || '',
+      Number(e.sales_amount || 0).toFixed(2),
+      Number(e.items_sold || 0),
+      Number(e.working_days || 1),
+      e.shift || '',
+    ].join('|');
+    const keyLoose = [
+      e.ba_name || '',
+      e.team || '',
+      e.entry_date || '',
+      Number(e.sales_amount || 0).toFixed(2),
+      Number(e.items_sold || 0),
+    ].join('|');
+    if (seen.has(keyStrict) || seenLoose.has(keyLoose)) continue;
+    seen.add(keyStrict);
+    seenLoose.add(keyLoose);
+    deduped.push(e);
+  }
+  dedupeDropped = rawEntries.length - deduped.length;
+  allEntries = deduped;
 
   // Populate BA filter
   const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
@@ -438,7 +659,36 @@ async function loadAll() {
 
   lastUpdated = new Date();
   updateLiveBadge();
+  buildTargetMonthSelector();
   applyFilters();
+}
+
+function showPageError(msg) {
+  const targetMsg = document.getElementById('target-msg');
+  if (targetMsg) {
+    targetMsg.style.color = '#dc2626';
+    targetMsg.textContent = msg;
+  }
+  const body = document.getElementById('tbl-body');
+  if (body) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+  }
+  const commBody = document.getElementById('comm-body');
+  if (commBody) {
+    commBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+  }
+}
+
+function renderDedupeInfo() {
+  const targetMsg = document.getElementById('target-msg');
+  if (!targetMsg) return;
+  if (dedupeDropped > 0) {
+    targetMsg.style.color = '#b45309';
+    targetMsg.textContent = `Ignored ${dedupeDropped} duplicate row(s) from sales data source.`;
+  } else if (!targetMsg.textContent || targetMsg.style.color === 'rgb(180, 83, 9)') {
+    targetMsg.style.color = '#6b7280';
+    targetMsg.textContent = '';
+  }
 }
 
 // ── Filters ──────────────────────────────────────────────────────
@@ -459,9 +709,12 @@ function filtered() {
 }
 
 function applyFilters() {
+  syncTargetMonthWithFilter();
   const e = filtered();
+  renderDedupeInfo();
   renderKPIs(e);
   renderTargets(e);
+  renderCommissions();
   renderCharts(e);
   if (viewMode === 'table') renderTable(e);
   else renderHeatmap(e);
@@ -470,6 +723,7 @@ function applyFilters() {
 function resetFilters() {
   ['f-team','f-ba','f-start','f-end'].forEach(id => { document.getElementById(id).value = ''; });
   buildMonthFilter();
+  syncTargetMonthWithFilter();
   applyFilters();
 }
 
@@ -496,20 +750,20 @@ function renderKPIs(entries) {
 
 // ── Team targets ─────────────────────────────────────────────────
 function renderTargets(entries) {
-  const month = document.getElementById('f-month').value;
-  const monthTargets = month && TARGETS[month] ? TARGETS[month] : null;
+  const month = getTargetMonth();
   const now   = new Date();
   const last  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const dLeft = last - now.getDate();
   const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate()-7);
   const sevenKey = sevenAgo.toISOString().slice(0,10);
+  const monthEntries = allEntries.filter(e => e.entry_date.slice(0, 7) === month);
 
-  document.getElementById('target-grid').innerHTML = ['Cairo','Sharm','Hurgadah'].map(team => {
-    const te      = entries.filter(e => e.team === team);
+  document.getElementById('target-grid').innerHTML = TEAMS.map(team => {
+    const te      = monthEntries.filter(e => e.team === team);
     const sales   = te.reduce((s,e) => s + +e.sales_amount, 0);
     const pcs     = te.reduce((s,e) => s + e.items_sold, 0);
     const uniqBAs = new Set(te.map(e => e.ba_id)).size;
-    const tgt     = monthTargets && uniqBAs ? monthTargets[team] * uniqBAs : null;
+    const tgt     = getTeamMonthlyTarget(month, team, uniqBAs);
     const pct     = tgt ? (sales / tgt) * 100 : 0;
     const rem     = tgt ? Math.max(0, tgt - sales) : null;
     const dailyNeed = rem && dLeft > 0 ? rem / dLeft : 0;
@@ -531,7 +785,7 @@ function renderTargets(entries) {
         </div>
         <div class="target-right">
           <div class="target-big">$${(sales/1000).toFixed(1)}k</div>
-          <div class="target-sub">${tgt ? 'of $'+(tgt/1000).toFixed(0)+'k target' : 'No target set'}</div>
+          <div class="target-sub">${tgt ? 'of $'+(tgt/1000).toFixed(0)+'k target • '+monthLabel(month) : 'No target set for '+monthLabel(month)}</div>
         </div>
       </div>
       <div class="prog-track"><div class="prog-fill" style="width:${Math.min(pct,100).toFixed(1)}%;background:${barGrad}"></div></div>
@@ -541,6 +795,134 @@ function renderTargets(entries) {
         <div><div class="ts-lbl">7-day avg/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">$${(avg7/1000).toFixed(1)}k</div></div>
       </div>
     </div>`;
+  }).join('');
+}
+
+async function saveTarget() {
+  const month = document.getElementById('target-month').value;
+  const team = document.getElementById('target-team').value;
+  const type = document.getElementById('target-type').value;
+  const value = Number(document.getElementById('target-value').value);
+  const msgEl = document.getElementById('target-msg');
+  msgEl.style.color = '#6b7280';
+  if (!month || !team || !type || !Number.isFinite(value) || value <= 0) {
+    msgEl.style.color = '#dc2626';
+    msgEl.textContent = 'Enter valid month, team, type, and amount.';
+    return;
+  }
+  const { error } = await sb.from('monthly_targets').upsert({
+    month_key: month,
+    team,
+    target_type: type,
+    target_value: value,
+  }, { onConflict: 'month_key,team' });
+  if (error) {
+    msgEl.style.color = '#dc2626';
+    msgEl.textContent = 'Save failed. Run setup.sql migration for monthly_targets.';
+    return;
+  }
+  msgEl.style.color = '#059669';
+  msgEl.textContent = `Saved ${team} target for ${monthLabel(month)}.`;
+  await loadMonthlyTargets();
+  buildTargetMonthSelector();
+  document.getElementById('t-month').value = month;
+  applyFilters();
+}
+
+function computeCommissionRows() {
+  const month = getTargetMonth();
+  const monthEntries = allEntries.filter(e => e.entry_date.slice(0, 7) === month);
+  const byTeam = {};
+  const byBA = {};
+  monthEntries.forEach(e => {
+    const sales = Number(e.sales_amount) || 0;
+    byTeam[e.team] = (byTeam[e.team] || 0) + sales;
+    if (!byBA[e.ba_name]) byBA[e.ba_name] = { ba_name: e.ba_name, team: e.team, sales: 0 };
+    byBA[e.ba_name].sales += sales;
+  });
+
+  const teamAttainment = {};
+  const teamRates = {};
+  TEAMS.forEach(team => {
+    const teamRows = Object.values(byBA).filter(r => r.team === team);
+    const activeBas = teamRows.length;
+    const target = getTeamMonthlyTarget(month, team, activeBas);
+    const teamSales = byTeam[team] || 0;
+    const pct = target ? (teamSales / target) * 100 : 0;
+    teamAttainment[team] = { pct, target, teamSales };
+    teamRates[team] = commissionRateFromPct(pct);
+  });
+
+  return Object.values(byBA)
+    .sort((a, b) => b.sales - a.sales)
+    .map(row => {
+      const cfg = getTargetConfig(month, row.team);
+      let rate = 0;
+      let basis = 'No target configured';
+      let attainment = 0;
+      let rule = 'No commission (missing target)';
+
+      if (cfg?.type === 'team_total') {
+        const t = teamAttainment[row.team];
+        attainment = t?.pct || 0;
+        rate = teamRates[row.team] || 0;
+        basis = `Team target $${fmt(t?.target || 0)}`;
+        rule = rate > 0
+          ? 'Hurghada-style team gate passed'
+          : 'Team below 70%: no commission';
+      } else if (cfg?.type === 'per_ba') {
+        const baTarget = cfg.value;
+        attainment = baTarget ? (row.sales / baTarget) * 100 : 0;
+        rate = commissionRateFromPct(attainment);
+        basis = `Per BA target $${fmt(baTarget)}`;
+        rule = rate > 0
+          ? 'Per-BA slab applied'
+          : 'BA below 70%: no commission';
+      }
+
+      const commission = row.sales * rate;
+      return {
+        ba_name: row.ba_name,
+        team: row.team,
+        month,
+        sales: row.sales,
+        basis,
+        attainment,
+        rate,
+        commission,
+        rule,
+      };
+    });
+}
+
+function renderCommissions() {
+  const rows = computeCommissionRows();
+  lastCommissionRows = rows;
+  const tbody = document.getElementById('comm-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:#9ca3af">No entries for selected month</td></tr>';
+    setText('comm-total', '$0');
+    setText('comm-sub', `No commission rows for ${monthLabel(getTargetMonth())}.`);
+    return;
+  }
+  const total = rows.reduce((s, r) => s + r.commission, 0);
+  setText('comm-total', '$' + fmt(total));
+  setText('comm-sub', `Commission month: ${monthLabel(getTargetMonth())} • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
+
+  tbody.innerHTML = rows.map(r => {
+    const pct = r.attainment.toFixed(1) + '%';
+    const ratePct = (r.rate * 100).toFixed(1) + '%';
+    return `<tr>
+      <td class="cell-name">${r.ba_name}</td>
+      <td>${r.team}</td>
+      <td>${monthLabel(r.month)}</td>
+      <td class="cell-amount">$${fmt(r.sales)}</td>
+      <td>${r.basis}</td>
+      <td>${pct}</td>
+      <td>${ratePct}</td>
+      <td class="cell-amount">$${fmt(r.commission)}</td>
+      <td>${r.rule}</td>
+    </tr>`;
   }).join('');
 }
 
@@ -706,8 +1088,45 @@ function exportToExcel() {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sales Data');
+  if (lastCommissionRows.length) {
+    const commRows = lastCommissionRows.map(r => ({
+      'BA Name': r.ba_name,
+      'Team': r.team,
+      'Month': monthLabel(r.month),
+      'Sales ($)': +r.sales.toFixed(2),
+      'Target Basis': r.basis,
+      'Attainment (%)': +r.attainment.toFixed(2),
+      'Rate (%)': +(r.rate * 100).toFixed(2),
+      'Commission ($)': +r.commission.toFixed(2),
+      'Rule': r.rule,
+    }));
+    const ws2 = XLSX.utils.json_to_sheet(commRows);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Commissions');
+  }
   const month = document.getElementById('f-month').value;
   XLSX.writeFile(wb, `BA_Sales${month ? '_' + month : ''}.xlsx`);
+}
+
+function exportCommissions() {
+  if (!lastCommissionRows.length) {
+    alert('No commission rows to export for selected month.');
+    return;
+  }
+  const rows = lastCommissionRows.map(r => ({
+    'BA Name': r.ba_name,
+    'Team': r.team,
+    'Month': monthLabel(r.month),
+    'Sales ($)': +r.sales.toFixed(2),
+    'Target Basis': r.basis,
+    'Attainment (%)': +r.attainment.toFixed(2),
+    'Rate (%)': +(r.rate * 100).toFixed(2),
+    'Commission ($)': +r.commission.toFixed(2),
+    'Rule': r.rule,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Commissions');
+  XLSX.writeFile(wb, `BA_Commissions_${getTargetMonth()}.xlsx`);
 }
 
 // ── Sign out ─────────────────────────────────────────────────────

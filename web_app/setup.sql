@@ -30,9 +30,28 @@ create table if not exists public.sales_entries (
   created_at    timestamptz default now()
 );
 
+-- TABLE 3: monthly_targets
+-- Manager-configurable targets per month and team.
+-- target_type:
+--   - per_ba: value is target per BA, final target = value * active BAs
+--   - team_total: value is full team target
+create table if not exists public.monthly_targets (
+  id           uuid primary key default gen_random_uuid(),
+  month_key    text not null, -- format: YYYY-MM
+  team         text not null check (team in ('Cairo', 'Sharm', 'Hurgadah')),
+  target_type  text not null check (target_type in ('per_ba', 'team_total')),
+  target_value numeric(12,2) not null check (target_value > 0),
+  created_by   uuid references public.profiles(id),
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now(),
+  unique (month_key, team)
+);
+
 -- Add working_days to existing databases (safe to run even if column already exists)
 alter table public.sales_entries
   add column if not exists working_days integer not null default 1;
+
+alter table public.monthly_targets enable row level security;
 
 -- ── Row Level Security (RLS) ─────────────────────────────────────
 -- RLS means: users can only see/edit data they're allowed to.
@@ -48,6 +67,8 @@ drop policy if exists "Users can update own profile"  on public.profiles;
 drop policy if exists "BAs can insert own sales"      on public.sales_entries;
 drop policy if exists "BAs can read own sales"        on public.sales_entries;
 drop policy if exists "Managers can read all sales"   on public.sales_entries;
+drop policy if exists "Managers can read monthly targets" on public.monthly_targets;
+drop policy if exists "Managers can write monthly targets" on public.monthly_targets;
 
 -- Helper function: check if the current user is a manager.
 -- Must be security definer so it runs as the owner (bypasses RLS),
@@ -89,6 +110,15 @@ create policy "BAs can read own sales"
 create policy "Managers can read all sales"
   on public.sales_entries for select
   using (public.is_manager());
+
+create policy "Managers can read monthly targets"
+  on public.monthly_targets for select
+  using (public.is_manager());
+
+create policy "Managers can write monthly targets"
+  on public.monthly_targets for all
+  using (public.is_manager())
+  with check (public.is_manager());
 
 -- ── Auto-create profile on signup ────────────────────────────────
 -- This is a "trigger" — it fires automatically when someone signs up.
