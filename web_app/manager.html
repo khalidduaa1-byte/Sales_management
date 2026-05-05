@@ -974,11 +974,12 @@ function filtered() {
   const team  = document.getElementById('f-team').value;
   const monthRaw = getGlobalMonthRaw();
   const ba    = document.getElementById('f-ba').value;
-  const shop  = document.getElementById('global-store').value;
+  const shop  = (document.getElementById('global-store').value || '').trim().toLowerCase();
   return allEntries.filter(e => {
     if (team  && e.team    !== team)   return false;
     if (ba    && e.ba_name !== ba)     return false;
-    if (shop  && (e.store || '') !== shop) return false;
+    const rowShop = (e.store || '').trim().toLowerCase();
+    if (shop  && rowShop !== shop) return false;
     if (monthRaw && monthKeyFromEntryDate(e.entry_date) !== monthRaw) return false;
     return true;
   });
@@ -997,9 +998,9 @@ function applyFilters() {
   const e = filtered();
   const roll = rollupEntries();
   renderDedupeInfo();
-  // KPI + target cards use full-month totals (all teams / all shops) so they match SQL.
-  // Performance table & charts still use `e` (team / BA / shop drill-down).
-  renderKPIs(roll);
+  // KPI cards should respect active drill-down filters (team / BA / shop / month).
+  // Target cards stay month-rollup so target math remains aligned to month totals.
+  renderKPIs(e);
   renderTargets(roll);
   renderCommissions();
   renderCharts(e);
