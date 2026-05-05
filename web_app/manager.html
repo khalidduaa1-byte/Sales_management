@@ -992,14 +992,21 @@ function rollupEntries() {
   return allEntries.filter(e => monthKeyFromEntryDate(e.entry_date) === monthRaw);
 }
 
+function rollupEntriesByShop() {
+  const shop = (document.getElementById('global-store').value || '').trim().toLowerCase();
+  const monthScoped = rollupEntries();
+  if (!shop) return monthScoped;
+  return monthScoped.filter(e => ((e.store || '').trim().toLowerCase()) === shop);
+}
+
 function applyFilters() {
   syncEditorMonthWithGlobal();
   buildDaysBadge();
   const e = filtered();
-  const roll = rollupEntries();
+  const roll = rollupEntriesByShop();
   renderDedupeInfo();
   // KPI cards should respect active drill-down filters (team / BA / shop / month).
-  // Target cards stay month-rollup so target math remains aligned to month totals.
+  // Target cards stay month-rollup and now follow selected shop.
   renderKPIs(e);
   renderTargets(roll);
   renderCommissions();
@@ -1155,7 +1162,7 @@ async function saveTarget() {
 
 function computeCommissionRows() {
   const month = getSelectedMonth();
-  const monthEntries = rollupEntries().filter(e => monthKeyFromEntryDate(e.entry_date) === month);
+  const monthEntries = rollupEntriesByShop().filter(e => monthKeyFromEntryDate(e.entry_date) === month);
   const byTeam = {};
   const byBA = {};
   monthEntries.forEach(e => {
@@ -1267,8 +1274,10 @@ function renderCommissions() {
     return;
   }
   const total = rows.reduce((s, r) => s + r.commission, 0);
+  const selectedShop = (document.getElementById('global-store').value || '').trim();
+  const shopScopeLabel = selectedShop ? `shop: ${selectedShop}` : 'all shops';
   setText('comm-total', '$' + fmt(total));
-  setText('comm-sub', `Commission month: ${monthLabel(getSelectedMonth())} (all shops) • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
+  setText('comm-sub', `Commission month: ${monthLabel(getSelectedMonth())} (${shopScopeLabel}) • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
 
   tbody.innerHTML = rows.map(r => {
     const pct = r.attainment.toFixed(1) + '%';
