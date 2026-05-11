@@ -465,6 +465,25 @@ def _detect_monthly_shape(df: pd.DataFrame) -> float:
     return one_day / len(g) if len(g) else 0.0
 
 
+def _warn_implausible_sales_rows(out: pd.DataFrame) -> None:
+    """Heuristic: catch obvious typos / column slips (e.g. huge $ with tiny item count)."""
+    if out.empty:
+        return
+    warned = 0
+    for _, r in out.iterrows():
+        amt = float(r["sales_amount"])
+        items = int(r["items_sold"] or 0)
+        if amt >= 3000 and items <= 5:
+            print(
+                f"WARNING: Implausible sales vs items — "
+                f"ba_name={r['ba_name']!r} entry_date={r['entry_date']!r} "
+                f"sales_amount={amt} items_sold={items}. Check the source Excel cell."
+            )
+            warned += 1
+    if warned:
+        print(f"\nWARNING: {warned} row(s) flagged as implausible (sales>=3000 and items<=5). Review before DB import.\n")
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -568,6 +587,8 @@ def main() -> None:
         ["ba_name", "team", "store", "shift", "sales_amount", "items_sold", "working_days", "entry_date"]
     ].copy()
     att_out = attendance_df[["ba_name", "team", "store", "entry_date", "status", "notes"]].copy() if not attendance_df.empty else pd.DataFrame(columns=["ba_name", "team", "store", "entry_date", "status", "notes"])
+
+    _warn_implausible_sales_rows(out)
 
     out.to_csv(args.output, index=False)
     att_out.to_csv(args.attendance_output, index=False)
