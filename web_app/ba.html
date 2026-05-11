@@ -55,6 +55,66 @@ body {
 }
 .signout-btn:hover { background: #f1f5f9; }
 
+/* ── Monthly target (BA only sees own progress; data scoped by RLS) ── */
+.target-banner {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 14px 16px 0;
+}
+.target-card {
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+.target-card h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e40af;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.target-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.target-row .big {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+.target-row .sub {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.35;
+}
+.target-bar-bg {
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.target-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+  transition: width 0.35s ease;
+  width: 0%;
+}
+.target-foot {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.target-foot strong { color: #1e293b; }
+
 .container { padding: 20px 16px; max-width: 480px; margin: 0 auto; }
 
 /* ── Stats row ── */
@@ -256,6 +316,19 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   <button class="signout-btn" onclick="signOut()">Sign out</button>
 </div>
 
+<!-- Target vs your sales (month) — only your rows are returned from Supabase for BAs -->
+<div class="target-banner" id="target-banner-wrap">
+  <div class="target-card" id="target-card">
+    <h3>Monthly target</h3>
+    <div class="target-row">
+      <div class="big" id="target-attain-pct">—</div>
+      <div class="sub" id="target-attain-sub">Loading…</div>
+    </div>
+    <div class="target-bar-bg"><div class="target-bar-fill" id="target-bar-fill"></div></div>
+    <div class="target-foot" id="target-foot"></div>
+  </div>
+</div>
+
 <div class="container">
 
   <!-- Stats summary -->
@@ -385,8 +458,125 @@ let currentProfile = null;
 
   setToday();
   await loadHistory();
-  updateStats();
+  await updateStats();
+  await refreshTargetBanner();
 })();
+
+// ── Team / month helpers (align with manager dashboard naming) ───
+function canonicalTeamName(raw) {
+  const key = String(raw || '').trim().toLowerCase();
+  if (key === 'cairo') return 'Cairo';
+  if (key === 'sharm') return 'Sharm';
+  if (['hurgadah', 'hurghada', 'hurgahda', 'hurgada'].includes(key)) return 'Hurgadah';
+  return raw || '';
+}
+
+function selectedMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthDateBounds(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const start = `${monthKey}-01`;
+  const last = new Date(y, m, 0).getDate();
+  const end = `${monthKey}-${String(last).padStart(2, '0')}`;
+  return { start, end };
+}
+
+/** Personal goal for the month (matches manager logic: per_ba vs team_total + headcount). */
+async function computePersonalMonthlyTarget(monthKey, teamCanon) {
+  const { data: tRow, error: tErr } = await sb
+    .from('monthly_targets')
+    .select('target_type, target_value')
+    .eq('month_key', monthKey)
+    .eq('team', teamCanon)
+    .maybeSingle();
+  if (tErr || !tRow) return { goal: null, mode: 'none', raw: null };
+
+  const type = tRow.target_type;
+  const value = Number(tRow.target_value) || 0;
+  if (type === 'per_ba') {
+    return { goal: value, mode: 'per_ba', raw: tRow };
+  }
+  const { count, error: cErr } = await sb
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('team', teamCanon)
+    .eq('role', 'ba');
+  const n = !cErr && count ? Math.max(1, count) : 1;
+  const share = value / n;
+  return { goal: share, mode: 'team_total', teamGoal: value, teamBas: n, raw: tRow };
+}
+
+async function refreshTargetBanner() {
+  const pctEl = document.getElementById('target-attain-pct');
+  const subEl = document.getElementById('target-attain-sub');
+  const footEl = document.getElementById('target-foot');
+  const barEl = document.getElementById('target-bar-fill');
+  const wrap = document.getElementById('target-banner-wrap');
+
+  if (!currentProfile || currentProfile.role !== 'ba') return;
+
+  const team = canonicalTeamName(currentProfile.team);
+  if (!team) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  const monthKey = selectedMonthKey();
+  const { start, end } = monthDateBounds(monthKey);
+
+  const [{ goal, mode, teamGoal, teamBas }, salesRes] = await Promise.all([
+    computePersonalMonthlyTarget(monthKey, team),
+    sb.from('sales_entries')
+      .select('sales_amount')
+      .gte('entry_date', start)
+      .lte('entry_date', end),
+  ]);
+
+  if (salesRes.error) {
+    subEl.textContent = 'Could not load your sales.';
+    footEl.textContent = salesRes.error.message || '';
+    pctEl.textContent = '—';
+    barEl.style.width = '0%';
+    return;
+  }
+
+  const mySales = (salesRes.data || []).reduce((s, r) => s + Number(r.sales_amount || 0), 0);
+
+  if (goal == null || !Number.isFinite(goal) || goal <= 0) {
+    pctEl.textContent = '—';
+    subEl.textContent = 'No target set';
+    footEl.innerHTML = `Your sales <strong>${monthKey}</strong>: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
+    barEl.style.width = '0%';
+    return;
+  }
+
+  const pct = Math.min(150, (mySales / goal) * 100);
+  const remain = Math.max(0, goal - mySales);
+
+  pctEl.textContent = `${pct.toFixed(0)}%`;
+  subEl.innerHTML =
+    `You: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
+    `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
+
+  if (mode === 'team_total' && teamGoal != null) {
+    footEl.innerHTML =
+      `Team target <strong>$${teamGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> split across <strong>${teamBas}</strong> BAs (even share for your progress bar). ` +
+      (remain > 0
+        ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to reach your share.`
+        : `<strong>Share reached</strong> — great work.`);
+  } else {
+    footEl.innerHTML =
+      remain > 0
+        ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to hit your personal target.`
+        : `Personal target reached — great work.`;
+  }
+
+  barEl.style.width = `${Math.min(100, pct)}%`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────
 function setToday() {
@@ -468,7 +658,8 @@ async function submitSale() {
     document.getElementById('entry-shift').value  = '';
     setToday();
     await loadHistory();
-    updateStats();
+    await updateStats();
+    await refreshTargetBanner();
   }
 }
 
@@ -486,7 +677,8 @@ async function deleteSale(saleId) {
   }
   showMsg('Sale entry deleted.', 'success');
   await loadHistory();
-  updateStats();
+  await updateStats();
+  await refreshTargetBanner();
 }
 
 // ── Submit an off/leave day ──────────────────────────────────────
@@ -527,18 +719,15 @@ async function submitLeave() {
 
 // ── Load history ──────────────────────────────────────────────────
 async function loadHistory() {
-  // sales history
+  // RLS returns only this BA's rows (ba_id match or legacy import matched to profile name).
   const { data: entries } = await sb
     .from('sales_entries')
     .select('*')
-    .eq('ba_id', currentUser.id)
     .order('entry_date', { ascending: false })
     .limit(30);
-  // attendance history (off day / annual leave)
   const { data: attendance } = await sb
     .from('ba_attendance_entries')
     .select('*')
-    .eq('ba_id', currentUser.id)
     .order('entry_date', { ascending: false })
     .limit(30);
 
@@ -546,6 +735,7 @@ async function loadHistory() {
   const salesRows = (entries || []).map(e => ({
     kind: 'sale',
     id: e.id,
+    ba_id: e.ba_id,
     entry_date: e.entry_date,
     created_at: e.created_at,
     store: e.store,
@@ -576,6 +766,10 @@ async function loadHistory() {
 
   list.innerHTML = rows.map(r => {
     if (r.kind === 'sale') {
+      const canDelete = r.ba_id && currentUser && r.ba_id === currentUser.id;
+      const delBtn = canDelete
+        ? `<button class="entry-delete" onclick="deleteSale('${r.id}')">Delete</button>`
+        : '';
       return `
         <div class="entry-row">
           <div class="entry-left">
@@ -585,7 +779,7 @@ async function loadHistory() {
           <div class="entry-right">
             <div class="entry-amount">$${Number(r.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
             <div class="entry-items">${r.items_sold} pcs</div>
-            <button class="entry-delete" onclick="deleteSale('${r.id}')">Delete</button>
+            ${delBtn}
           </div>
         </div>
       `;
@@ -607,16 +801,16 @@ async function loadHistory() {
 
 // ── Update stats ──────────────────────────────────────────────────
 async function updateStats() {
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const monthKey = selectedMonthKey();
+  const { start, end } = monthDateBounds(monthKey);
 
-  const { data: entries } = await sb
+  const { data: entries, error } = await sb
     .from('sales_entries')
-    .select('sales_amount, items_sold')
-    .eq('ba_id', currentUser.id)
-    .gte('entry_date', monthStart);  // gte = greater than or equal
+    .select('sales_amount, items_sold, entry_date')
+    .gte('entry_date', start)
+    .lte('entry_date', end);
 
-  if (!entries) return;
+  if (error || !entries) return;
   const totalSales = entries.reduce((s, e) => s + Number(e.sales_amount), 0);
   const totalItems = entries.reduce((s, e) => s + e.items_sold, 0);
 

@@ -113,9 +113,13 @@ drop policy if exists "Managers can read all profiles" on public.profiles;
 drop policy if exists "Users can update own profile"  on public.profiles;
 drop policy if exists "BAs can insert own sales"      on public.sales_entries;
 drop policy if exists "BAs can read own sales"        on public.sales_entries;
+drop policy if exists "BAs can update own sales"     on public.sales_entries;
+drop policy if exists "BAs can delete own sales"     on public.sales_entries;
 drop policy if exists "Managers can read all sales"   on public.sales_entries;
 drop policy if exists "Managers can read monthly targets" on public.monthly_targets;
 drop policy if exists "Managers can write monthly targets" on public.monthly_targets;
+drop policy if exists "BAs can read team monthly targets" on public.monthly_targets;
+drop policy if exists "BAs can read same-team BA profiles" on public.profiles;
 drop policy if exists "BAs can insert own attendance" on public.ba_attendance_entries;
 drop policy if exists "BAs can read own attendance" on public.ba_attendance_entries;
 drop policy if exists "BAs can update own attendance" on public.ba_attendance_entries;
@@ -149,13 +153,44 @@ create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id);
 
+-- BAs can see other BAs on the same team (name/team only) so the app can count headcount
+-- for per-BA targets without exposing sales data.
+create policy "BAs can read same-team BA profiles"
+  on public.profiles for select
+  using (
+    exists (
+      select 1 from public.profiles me
+      where me.id = auth.uid()
+        and me.role = 'ba'
+        and me.team is not null
+        and public.profiles.role = 'ba'
+        and public.profiles.team = me.team
+    )
+  );
+
 -- sales_entries: BAs can insert + read their own; managers read all
 create policy "BAs can insert own sales"
   on public.sales_entries for insert
   with check (ba_id = auth.uid());
 
+-- Own rows by ba_id, plus legacy imports where ba_id is null but ba_name matches the signed-in profile name.
 create policy "BAs can read own sales"
   on public.sales_entries for select
+  using (
+    ba_id = auth.uid()
+    or (
+      ba_id is null
+      and lower(trim(ba_name)) = lower(trim((select p.name from public.profiles p where p.id = auth.uid())))
+    )
+  );
+
+create policy "BAs can update own sales"
+  on public.sales_entries for update
+  using (ba_id = auth.uid())
+  with check (ba_id = auth.uid());
+
+create policy "BAs can delete own sales"
+  on public.sales_entries for delete
   using (ba_id = auth.uid());
 
 create policy "Managers can read all sales"
@@ -165,6 +200,13 @@ create policy "Managers can read all sales"
 create policy "Managers can read monthly targets"
   on public.monthly_targets for select
   using (public.is_manager());
+
+-- BAs see targets for their own team only (used on the BA home screen).
+create policy "BAs can read team monthly targets"
+  on public.monthly_targets for select
+  using (
+    team = (select p.team from public.profiles p where p.id = auth.uid() and p.role = 'ba')
+  );
 
 create policy "Managers can write monthly targets"
   on public.monthly_targets for all
