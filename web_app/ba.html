@@ -422,7 +422,13 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
+  {
+    global: {
+      fetch: (url, options = {}) =>
+        fetch(url, { ...options, cache: 'no-store' }),
+    },
+  }
 );
 
 let currentUser = null;
@@ -666,13 +672,24 @@ async function submitSale() {
 async function deleteSale(saleId) {
   if (!saleId) return;
   if (!confirm('Delete this sale entry? This cannot be undone.')) return;
-  const { error } = await sb
+  const uid = currentUser && currentUser.id ? String(currentUser.id) : '';
+  if (!uid) {
+    showMsg('Not signed in. Refresh the page and try again.', 'error');
+    return;
+  }
+  // .select() is required: DELETE can match 0 rows (RLS / wrong id) and still return error: null.
+  // RLS decides which rows may be deleted (own ba_id or legacy name-matched import).
+  const { data, error } = await sb
     .from('sales_entries')
     .delete()
     .eq('id', saleId)
-    .eq('ba_id', currentUser.id);
+    .select('id');
   if (error) {
     showMsg('Error deleting sale: ' + error.message, 'error');
+    return;
+  }
+  if (!data || data.length === 0) {
+    showMsg('Could not delete this entry (nothing removed). If it is an old import, ask a manager to remove it in Supabase.', 'error');
     return;
   }
   showMsg('Sale entry deleted.', 'success');
@@ -766,9 +783,10 @@ async function loadHistory() {
 
   list.innerHTML = rows.map(r => {
     if (r.kind === 'sale') {
-      const canDelete = r.ba_id && currentUser && r.ba_id === currentUser.id;
+      // RLS only returns this BA's app rows + legacy imports for their name; expanded delete policy allows both.
+      const canDelete = true;
       const delBtn = canDelete
-        ? `<button class="entry-delete" onclick="deleteSale('${r.id}')">Delete</button>`
+        ? `<button type="button" class="entry-delete" data-sale-id="${r.id}">Delete</button>`
         : '';
       return `
         <div class="entry-row">
@@ -835,6 +853,20 @@ function showMsg(text, type) {
   el.style.display = 'block';
   if (type === 'success') setTimeout(() => el.style.display = 'none', 3000);
 }
+
+// Inline onclick can fail to resolve async handlers in some mobile / in-app browsers; delegate clicks.
+document.getElementById('history-list').addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest && e.target.closest('.entry-delete');
+  if (!btn || !btn.getAttribute) return;
+  const id = btn.getAttribute('data-sale-id');
+  if (id) {
+    e.preventDefault();
+    deleteSale(id);
+  }
+});
+
+// Explicit globals for other inline handlers (setToday, submitSale, signOut, …).
+window.deleteSale = deleteSale;
 </script>
 </body>
 </html>

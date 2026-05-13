@@ -189,9 +189,17 @@ create policy "BAs can update own sales"
   using (ba_id = auth.uid())
   with check (ba_id = auth.uid());
 
+-- Mirror read policy: BAs may remove app rows (ba_id set) and legacy import rows
+-- matched by name (ba_id null). Otherwise duplicate date/shop/shift can look "undeletable".
 create policy "BAs can delete own sales"
   on public.sales_entries for delete
-  using (ba_id = auth.uid());
+  using (
+    ba_id = auth.uid()
+    or (
+      ba_id is null
+      and lower(trim(ba_name)) = lower(trim((select p.name from public.profiles p where p.id = auth.uid())))
+    )
+  );
 
 create policy "Managers can read all sales"
   on public.sales_entries for select
