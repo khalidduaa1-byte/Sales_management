@@ -3,6 +3,9 @@ sales_data.xlsx
 *.xlsx
 report.html
 
+# Root-level import scratch CSVs (tracked exports live under web_app/ when committed)
+/normalized_*.csv
+
 # Import scripts may contain secrets
 import_historical.py
 
