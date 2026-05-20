@@ -394,6 +394,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
 .cal-cell-off { background: #fef9c3; color: #a16207; font-size: 10px; }
 .cal-cell-al { background: #dbeafe; color: #1d4ed8; font-size: 9px; letter-spacing: -0.5px; }
 .cal-cell-other { background: #f3e8ff; color: #7c3aed; font-size: 10px; }
+.cal-cell-future { background: #f9fafb; color: #d1d5db; font-size: 12px; font-weight: 500; }
+.cal-day-th.future-day .cal-day-num { color: #9ca3af; }
 .cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #dc2626; }
 </style>
 </head>
@@ -666,9 +668,10 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <span class="cal-legend-item"><span class="cal-pill cal-cell-off">OFF</span> Off day (BA marked)</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-al">AL</span> Annual leave</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other leave</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-future">·</span> Upcoming (not counted)</span>
     </div>
     <p class="miss-summary" style="margin-top:8px;margin-bottom:0">
-      <strong>Month</strong> filter above (through today for the current month). Hover a cell for details.
+      Full month shown. <strong>Missing</strong> counts only days through today. Hover a cell for details.
     </p>
   </div>
   <div class="table-card missing-section" id="missing-cal-wrap" style="display:none;padding:0;overflow:hidden">
@@ -1897,16 +1900,23 @@ function enumerateDatesInclusive(start, end) {
   return out;
 }
 
-function monthCheckRange(monthKey) {
+function monthCalendarRange(monthKey) {
   const { y, m } = parseMonthKey(monthKey);
   const start = `${monthKey}-01`;
   const lastDay = new Date(y, m, 0).getDate();
-  const endOfMonth = `${monthKey}-${String(lastDay).padStart(2, '0')}`;
+  const end = `${monthKey}-${String(lastDay).padStart(2, '0')}`;
   const today = new Date().toISOString().slice(0, 10);
-  const end = monthKey === getCurrentMonthKey()
-    ? (today < start ? start : (today > endOfMonth ? endOfMonth : today))
-    : endOfMonth;
-  return { start, end };
+  const isCurrent = monthKey === getCurrentMonthKey();
+  const checkEnd = isCurrent
+    ? (today < start ? start : (today > end ? end : today))
+    : end;
+  return { start, end, checkEnd, isCurrent };
+}
+
+/** @deprecated alias — use monthCalendarRange */
+function monthCheckRange(monthKey) {
+  const r = monthCalendarRange(monthKey);
+  return { start: r.start, end: r.end, checkEnd: r.checkEnd };
 }
 
 function entryMatchesProfile(entry, profile) {
@@ -1933,9 +1943,9 @@ function getProfileAttendanceStatus(profile, date, attById, attByName) {
 }
 
 function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
-  const { start, end } = monthCheckRange(monthKey);
+  const { start, end, checkEnd, isCurrent } = monthCalendarRange(monthKey);
   const dates = enumerateDatesInclusive(start, end);
-  if (!dates.length) return { dates: [], rows: [], start, end };
+  if (!dates.length) return { dates: [], rows: [], start, end, checkEnd, isCurrent };
 
   const salesById = new Map();
   const salesByName = new Map();
@@ -1999,6 +2009,9 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
     ]);
 
     const cells = dates.map(date => {
+      if (isCurrent && date > checkEnd) {
+        return { date, status: 'future', label: 'Upcoming — not due yet' };
+      }
       let status = 'missing';
       let label = 'Missing sales';
       if (salesDates.has(date)) {
@@ -2028,7 +2041,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
     if (b.missing_count !== a.missing_count) return b.missing_count - a.missing_count;
     return a.ba_name.localeCompare(b.ba_name);
   });
-  return { dates, rows, start, end };
+  return { dates, rows, start, end, checkEnd, isCurrent };
 }
 
 function buildMissingSubmissionRows(monthKey, teamFilter, shopLower) {
@@ -2044,6 +2057,9 @@ function calDayMeta(dateStr) {
 
 function missingCellMarkup(cell) {
   const title = `${cell.date} — ${cell.label}`;
+  if (cell.status === 'future') {
+    return `<td class="cal-cell cal-cell-future" title="${title}">·</td>`;
+  }
   if (cell.status === 'sales') {
     return `<td class="cal-cell cal-cell-sold" title="${title}">✓</td>`;
   }
@@ -2082,7 +2098,8 @@ function renderMissingCalendar(model) {
 
   const headDays = model.dates.map(d => {
     const m = calDayMeta(d);
-    return `<th class="cal-day-th${m.weekend ? ' weekend' : ''}"><span class="cal-day-num">${m.day}</span><span class="cal-dow">${m.dow}</span></th>`;
+    const future = model.isCurrent && d > model.checkEnd;
+    return `<th class="cal-day-th${m.weekend ? ' weekend' : ''}${future ? ' future-day' : ''}"><span class="cal-day-num">${m.day}</span><span class="cal-dow">${m.dow}</span></th>`;
   }).join('');
 
   const body = model.rows.map(r => {
@@ -2138,8 +2155,11 @@ function renderMissingSubmissions() {
   const totalGaps = withGaps.reduce((s, r) => s + r.missing_count, 0);
 
   if (summary) {
+    const through = model.isCurrent && model.checkEnd < model.end
+      ? ` • gaps through ${fmtDate(model.checkEnd)}`
+      : '';
     summary.textContent =
-      `${monthLabel(monthKey)} • ${model.start} → ${model.end} • ` +
+      `${monthLabel(monthKey)} • ${model.start} → ${model.end}${through} • ` +
       `${withGaps.length} BA${withGaps.length !== 1 ? 's' : ''} with gaps • ${totalGaps} missing day${totalGaps !== 1 ? 's' : ''}`;
   }
 
@@ -2175,6 +2195,7 @@ function missingStatusLabel(status) {
   if (status === 'off_day') return 'Off day';
   if (status === 'annual_leave') return 'Annual leave';
   if (status === 'other') return 'Other leave';
+  if (status === 'future') return 'Upcoming';
   return 'Missing sales';
 }
 
