@@ -296,6 +296,105 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   border-color: #2563eb;
   color: #fff;
 }
+.miss-summary {
+  font-size: 13px;
+  color: #374151;
+  margin-bottom: 12px;
+}
+.miss-summary strong { color: #111827; }
+.miss-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.miss-badge.warn { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.miss-badge.ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.miss-dates { font-size: 12px; color: #6b7280; line-height: 1.5; max-width: 520px; }
+.cal-legend {
+  display: flex; flex-wrap: wrap; gap: 10px 18px;
+  font-size: 12px; color: #374151; margin-bottom: 12px;
+}
+.cal-legend-item { display: flex; align-items: center; gap: 6px; }
+.cal-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  font-size: 13px; font-weight: 800; border: 1px solid transparent;
+}
+.cal-scroll {
+  overflow: auto;
+  max-height: min(70vh, 720px);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+}
+.cal-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  min-width: max-content;
+}
+.cal-grid th, .cal-grid td {
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+.cal-grid thead th {
+  position: sticky; top: 0; z-index: 3;
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+.cal-grid .cal-sticky-ba {
+  position: sticky; left: 0; z-index: 4;
+  background: #f9fafb;
+  text-align: left;
+  padding: 8px 12px;
+  min-width: 150px;
+  max-width: 180px;
+  font-weight: 700;
+  color: #111827;
+  border-right: 2px solid #d1d5db;
+}
+.cal-grid tbody .cal-sticky-ba {
+  background: #fff;
+  z-index: 2;
+}
+.cal-grid .cal-sticky-team {
+  position: sticky; left: 150px; z-index: 4;
+  background: #f9fafb;
+  padding: 8px 10px;
+  min-width: 72px;
+  font-size: 10px;
+  color: #6b7280;
+  border-right: 2px solid #d1d5db;
+}
+.cal-grid tbody .cal-sticky-team {
+  background: #fff;
+  z-index: 2;
+}
+.cal-day-th {
+  min-width: 30px;
+  padding: 6px 2px;
+  line-height: 1.2;
+}
+.cal-day-th.weekend { background: #f3f4f6; }
+.cal-day-num { display: block; font-size: 12px; font-weight: 800; color: #111827; }
+.cal-dow { display: block; font-size: 9px; color: #9ca3af; font-weight: 500; }
+.cal-cell {
+  width: 30px; height: 30px;
+  font-size: 14px; font-weight: 800;
+  cursor: default;
+}
+.cal-cell-sold { background: #dcfce7; color: #15803d; }
+.cal-cell-miss { background: #fef2f2; color: #dc2626; }
+.cal-cell-off { background: #fef9c3; color: #a16207; font-size: 10px; }
+.cal-cell-al { background: #dbeafe; color: #1d4ed8; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-other { background: #f3e8ff; color: #7c3aed; font-size: 10px; }
+.cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #dc2626; }
 </style>
 </head>
 <body>
@@ -333,6 +432,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <button class="page-tab-btn" id="tab-targets" onclick="setMainTab('targets')">Targets & Commissions</button>
       <button class="page-tab-btn" id="tab-daily" onclick="setMainTab('daily')">Daily BA Sales</button>
       <button class="page-tab-btn" id="tab-profile" onclick="setMainTab('profile')">BA Profile</button>
+      <button class="page-tab-btn" id="tab-missing" onclick="setMainTab('missing')">Missing Sales</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
@@ -545,6 +645,54 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
+  <!-- Missing sales submissions -->
+  <div class="sec-lbl missing-section" style="display:none">Sales Attendance Calendar</div>
+  <div class="filter-card missing-section" style="display:none;margin-bottom:14px">
+    <div class="filter-row">
+      <select class="f-sel" id="missing-team" onchange="renderMissingSubmissions()">
+        <option value="">All Teams</option>
+        <option>Cairo</option><option>Sharm</option><option>Hurgadah</option>
+      </select>
+      <div class="view-toggle">
+        <button class="btn-view active" id="btn-miss-cal" onclick="setMissingView('calendar')">Calendar</button>
+        <button class="btn-view" id="btn-miss-list" onclick="setMissingView('list')">List</button>
+      </div>
+      <button class="btn-reset" onclick="exportMissingSubmissions()">↓ Export</button>
+      <span style="font-size:12px;color:#6b7280" id="missing-summary"></span>
+    </div>
+    <div class="cal-legend missing-section" style="margin-top:12px">
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-sold">✓</span> Sales logged</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-miss">✗</span> Missing — no sales</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-off">OFF</span> Off day (BA marked)</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-al">AL</span> Annual leave</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other leave</span>
+    </div>
+    <p class="miss-summary" style="margin-top:8px;margin-bottom:0">
+      <strong>Month</strong> filter above (through today for the current month). Hover a cell for details.
+    </p>
+  </div>
+  <div class="table-card missing-section" id="missing-cal-wrap" style="display:none;padding:0;overflow:hidden">
+    <div class="cal-scroll" id="missing-cal-scroll">
+      <div id="missing-cal-host" style="padding:12px;color:#9ca3af">Select a month to load the calendar</div>
+    </div>
+  </div>
+  <div class="table-card missing-section" id="missing-list-wrap" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>BA Name</th>
+          <th>Team</th>
+          <th>Shop</th>
+          <th>Missing Days</th>
+          <th>Missing Dates</th>
+        </tr></thead>
+        <tbody id="missing-body">
+          <tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">Select a month to check missing submissions</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -588,6 +736,10 @@ const TEAMS = ['Cairo', 'Sharm', 'Hurgadah'];
 let lastCommissionRows = [];
 let dedupeDropped = 0;
 let teamHeadcount = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
+let allBaProfiles = [];
+let lastMissingRows = [];
+let lastMissingModel = null;
+let missingViewMode = 'calendar';
 let mainTab = 'performance';
 let commSortCol = 'sales';
 let commSortAsc = false;
@@ -765,22 +917,32 @@ function setMainTab(tab) {
   document.querySelectorAll('.profile-section').forEach(el => {
     el.style.display = tab === 'profile' ? '' : 'none';
   });
+  document.querySelectorAll('.missing-section').forEach(el => {
+    el.style.display = tab === 'missing' ? '' : 'none';
+  });
   document.getElementById('tab-performance').classList.toggle('active', tab === 'performance');
   document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
   document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
   document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
+  document.getElementById('tab-missing').classList.toggle('active', tab === 'missing');
   if (tab === 'daily') renderDailySales();
   if (tab === 'profile') renderBAProfile();
+  if (tab === 'missing') renderMissingSubmissions();
   if (tab === 'performance') refreshPerformanceCharts();
 }
 
 async function loadTeamHeadcount() {
-  const { data, error } = await sb.from('profiles').select('team, role').eq('role', 'ba');
+  const { data, error } = await sb.from('profiles').select('id, name, team, store, role').eq('role', 'ba');
   if (error) return;
   const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
-  (data || []).forEach(p => {
-    const team = canonicalTeamName(p.team);
-    if (counts[team] !== undefined) counts[team] += 1;
+  allBaProfiles = (data || []).map(p => ({
+    id: p.id,
+    name: canonicalBaName(p.name),
+    team: canonicalTeamName(p.team),
+    store: String(p.store || '').trim(),
+  }));
+  allBaProfiles.forEach(p => {
+    if (counts[p.team] !== undefined) counts[p.team] += 1;
   });
   teamHeadcount = counts;
 }
@@ -1015,6 +1177,7 @@ function applyFilters() {
   else renderHeatmap(e);
   if (mainTab === 'daily') renderDailySales();
   if (mainTab === 'profile') renderBAProfile();
+  if (mainTab === 'missing') renderMissingSubmissions();
   if (mainTab === 'performance') {
     requestAnimationFrame(() => plotlyResizeBothCharts());
   }
@@ -1716,6 +1879,343 @@ function exportDailySales() {
   const shop = (document.getElementById('global-store') || {}).value || 'all';
   const ba = (document.getElementById('daily-ba') || {}).value || 'all';
   XLSX.writeFile(wb, `Daily_BA_Sales_${m}_${shop || 'all'}_${ba || 'all'}.xlsx`);
+}
+
+// ── Missing sales submissions ─────────────────────────────────────
+function enumerateDatesInclusive(start, end) {
+  const out = [];
+  if (!start || !end || start > end) return out;
+  const cur = new Date(start + 'T12:00:00');
+  const last = new Date(end + 'T12:00:00');
+  while (cur <= last) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+function monthCheckRange(monthKey) {
+  const { y, m } = parseMonthKey(monthKey);
+  const start = `${monthKey}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const endOfMonth = `${monthKey}-${String(lastDay).padStart(2, '0')}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const end = monthKey === getCurrentMonthKey()
+    ? (today < start ? start : (today > endOfMonth ? endOfMonth : today))
+    : endOfMonth;
+  return { start, end };
+}
+
+function entryMatchesProfile(entry, profile) {
+  if (entry.ba_id && profile.id && entry.ba_id === profile.id) return true;
+  return canonicalBaName(entry.ba_name) === profile.name;
+}
+
+function baPassesShopFilter(profile, shopLower, monthKey) {
+  if (!shopLower) return true;
+  const pShop = (profile.store || '').trim().toLowerCase();
+  if (pShop && pShop === shopLower) return true;
+  if (pShop && pShop !== shopLower) return false;
+  return allEntries.some(e =>
+    monthKeyFromEntryDate(e.entry_date) === monthKey
+    && entryMatchesProfile(e, profile)
+    && (e.store || '').trim().toLowerCase() === shopLower
+  );
+}
+
+function getProfileAttendanceStatus(profile, date, attById, attByName) {
+  const idMap = profile.id ? attById.get(profile.id) : null;
+  const nameMap = attByName.get(profile.name);
+  return (idMap && idMap.get(date)) || (nameMap && nameMap.get(date)) || null;
+}
+
+function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
+  const { start, end } = monthCheckRange(monthKey);
+  const dates = enumerateDatesInclusive(start, end);
+  if (!dates.length) return { dates: [], rows: [], start, end };
+
+  const salesById = new Map();
+  const salesByName = new Map();
+  const attById = new Map();
+  const attByName = new Map();
+
+  const addSale = (map, key, date) => {
+    if (!key || !date) return;
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(date);
+  };
+  const addAtt = (map, key, date, status) => {
+    if (!key || !date || !status) return;
+    if (!map.has(key)) map.set(key, new Map());
+    map.get(key).set(date, status);
+  };
+
+  allEntries.forEach(e => {
+    if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+    if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
+    if (shopLower && (e.store || '').trim().toLowerCase() !== shopLower) return;
+    const d = normalizeEntryDate(e.entry_date);
+    if (e.ba_id) addSale(salesById, e.ba_id, d);
+    addSale(salesByName, canonicalBaName(e.ba_name), d);
+  });
+
+  attendanceEntries.forEach(e => {
+    if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+    if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
+    if (shopLower && (e.store || '').trim().toLowerCase() !== shopLower) return;
+    const d = normalizeEntryDate(e.entry_date);
+    const status = e.status || 'off_day';
+    if (e.ba_id) addAtt(attById, e.ba_id, d, status);
+    addAtt(attByName, canonicalBaName(e.ba_name), d, status);
+  });
+
+  const seen = new Set();
+  const bas = [...allBaProfiles];
+  allEntries.forEach(e => {
+    if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+    const name = canonicalBaName(e.ba_name);
+    if (!name || seen.has(name)) return;
+    if (bas.some(p => p.name === name || (e.ba_id && p.id === e.ba_id))) return;
+    seen.add(name);
+    bas.push({
+      id: e.ba_id || null,
+      name,
+      team: canonicalTeamName(e.team),
+      store: String(e.store || '').trim(),
+    });
+  });
+
+  const rows = [];
+  bas.forEach(profile => {
+    if (teamFilter && profile.team !== teamFilter) return;
+    if (!baPassesShopFilter(profile, shopLower, monthKey)) return;
+
+    const salesDates = new Set([
+      ...(salesById.get(profile.id) || []),
+      ...(salesByName.get(profile.name) || []),
+    ]);
+
+    const cells = dates.map(date => {
+      let status = 'missing';
+      let label = 'Missing sales';
+      if (salesDates.has(date)) {
+        status = 'sales';
+        label = 'Sales logged';
+      } else {
+        const att = getProfileAttendanceStatus(profile, date, attById, attByName);
+        if (att === 'off_day') { status = 'off_day'; label = 'Off day'; }
+        else if (att === 'annual_leave') { status = 'annual_leave'; label = 'Annual leave'; }
+        else if (att === 'other') { status = 'other'; label = 'Other leave'; }
+      }
+      return { date, status, label };
+    });
+
+    const missingDates = cells.filter(c => c.status === 'missing').map(c => c.date);
+    rows.push({
+      ba_name: profile.name,
+      team: profile.team || '—',
+      store: profile.store || '—',
+      missing_count: missingDates.length,
+      missing_dates: missingDates,
+      cells,
+    });
+  });
+
+  rows.sort((a, b) => {
+    if (b.missing_count !== a.missing_count) return b.missing_count - a.missing_count;
+    return a.ba_name.localeCompare(b.ba_name);
+  });
+  return { dates, rows, start, end };
+}
+
+function buildMissingSubmissionRows(monthKey, teamFilter, shopLower) {
+  return buildMissingSubmissionModel(monthKey, teamFilter, shopLower).rows;
+}
+
+function calDayMeta(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const day = String(parseInt(dateStr.slice(8, 10), 10));
+  return { day, dow, weekend: d.getDay() === 0 || d.getDay() === 6 };
+}
+
+function missingCellMarkup(cell) {
+  const title = `${cell.date} — ${cell.label}`;
+  if (cell.status === 'sales') {
+    return `<td class="cal-cell cal-cell-sold" title="${title}">✓</td>`;
+  }
+  if (cell.status === 'off_day') {
+    return `<td class="cal-cell cal-cell-off" title="${title}">OFF</td>`;
+  }
+  if (cell.status === 'annual_leave') {
+    return `<td class="cal-cell cal-cell-al" title="${title}">AL</td>`;
+  }
+  if (cell.status === 'other') {
+    return `<td class="cal-cell cal-cell-other" title="${title}">L</td>`;
+  }
+  return `<td class="cal-cell cal-cell-miss" title="${title}">✗</td>`;
+}
+
+function setMissingView(mode) {
+  missingViewMode = mode;
+  document.getElementById('btn-miss-cal').classList.toggle('active', mode === 'calendar');
+  document.getElementById('btn-miss-list').classList.toggle('active', mode === 'list');
+  document.getElementById('missing-cal-wrap').style.display = mode === 'calendar' ? '' : 'none';
+  document.getElementById('missing-list-wrap').style.display = mode === 'list' ? '' : 'none';
+  renderMissingSubmissions();
+}
+
+function renderMissingCalendar(model) {
+  const host = document.getElementById('missing-cal-host');
+  if (!host) return;
+  if (!model || !model.dates.length) {
+    host.innerHTML = '<p style="padding:20px;color:#9ca3af">No dates in range for this month.</p>';
+    return;
+  }
+  if (!model.rows.length) {
+    host.innerHTML = '<p style="padding:20px;color:#9ca3af">No BAs match these filters.</p>';
+    return;
+  }
+
+  const headDays = model.dates.map(d => {
+    const m = calDayMeta(d);
+    return `<th class="cal-day-th${m.weekend ? ' weekend' : ''}"><span class="cal-day-num">${m.day}</span><span class="cal-dow">${m.dow}</span></th>`;
+  }).join('');
+
+  const body = model.rows.map(r => {
+    const rowClass = r.missing_count > 0 ? 'cal-row-gap' : '';
+    const cells = r.cells.map(c => missingCellMarkup(c)).join('');
+    return `<tr class="${rowClass}">
+      <td class="cal-sticky-ba">${r.ba_name}</td>
+      <td class="cal-sticky-team">${r.team}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  host.innerHTML = `<table class="cal-grid">
+    <thead><tr>
+      <th class="cal-sticky-ba">BA</th>
+      <th class="cal-sticky-team">Team</th>
+      ${headDays}
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
+}
+
+function renderMissingSubmissions() {
+  const tbody = document.getElementById('missing-body');
+  const summary = document.getElementById('missing-summary');
+  const calHost = document.getElementById('missing-cal-host');
+  const emptyMsg = 'Pick a single month in the filter above (not “All Months”).';
+
+  document.getElementById('missing-cal-wrap').style.display =
+    missingViewMode === 'calendar' ? '' : 'none';
+  document.getElementById('missing-list-wrap').style.display =
+    missingViewMode === 'list' ? '' : 'none';
+
+  const monthKey = getGlobalMonthRaw();
+  if (!monthKey) {
+    lastMissingRows = [];
+    lastMissingModel = null;
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">${emptyMsg}</td></tr>`;
+    }
+    if (calHost) calHost.innerHTML = `<p style="padding:20px;color:#9ca3af">${emptyMsg}</p>`;
+    if (summary) summary.textContent = '';
+    return;
+  }
+
+  const teamFilter = (document.getElementById('missing-team') || {}).value || '';
+  const shopLower = (document.getElementById('global-store').value || '').trim().toLowerCase();
+  const model = buildMissingSubmissionModel(monthKey, teamFilter, shopLower);
+  lastMissingModel = model;
+  lastMissingRows = model.rows;
+
+  const withGaps = model.rows.filter(r => r.missing_count > 0);
+  const totalGaps = withGaps.reduce((s, r) => s + r.missing_count, 0);
+
+  if (summary) {
+    summary.textContent =
+      `${monthLabel(monthKey)} • ${model.start} → ${model.end} • ` +
+      `${withGaps.length} BA${withGaps.length !== 1 ? 's' : ''} with gaps • ${totalGaps} missing day${totalGaps !== 1 ? 's' : ''}`;
+  }
+
+  if (missingViewMode === 'calendar') {
+    renderMissingCalendar(model);
+  }
+
+  if (!tbody) return;
+  if (!model.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">No BAs match these filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = model.rows.map(r => {
+    const badge = r.missing_count
+      ? `<span class="miss-badge warn">${r.missing_count}</span>`
+      : `<span class="miss-badge ok">0</span>`;
+    const datesText = r.missing_count
+      ? r.missing_dates.map(d => fmtDate(d)).join(', ')
+      : '—';
+    return `<tr>
+      <td>${r.ba_name}</td>
+      <td>${r.team}</td>
+      <td>${r.store}</td>
+      <td>${badge}</td>
+      <td class="miss-dates">${datesText}</td>
+    </tr>`;
+  }).join('');
+}
+
+function missingStatusLabel(status) {
+  if (status === 'sales') return 'Sales logged';
+  if (status === 'off_day') return 'Off day';
+  if (status === 'annual_leave') return 'Annual leave';
+  if (status === 'other') return 'Other leave';
+  return 'Missing sales';
+}
+
+function exportMissingSubmissions() {
+  const monthKey = getGlobalMonthRaw();
+  if (!monthKey) {
+    alert('Select a single month first.');
+    return;
+  }
+  renderMissingSubmissions();
+  const model = lastMissingModel;
+  if (!model || !model.rows.length) {
+    alert('No data to export.');
+    return;
+  }
+
+  const flat = [];
+  model.rows.forEach(r => {
+    r.cells.forEach(c => {
+      flat.push({
+        'BA Name': r.ba_name,
+        'Team': r.team,
+        'Shop': r.store,
+        'Date': c.date,
+        'Status': missingStatusLabel(c.status),
+      });
+    });
+  });
+
+  const gridHeader = ['BA', 'Team', ...model.dates];
+  const gridRows = model.rows.map(r => {
+    const byDate = Object.fromEntries(r.cells.map(c => [c.date, missingStatusLabel(c.status)]));
+    return [r.ba_name, r.team, ...model.dates.map(d => byDate[d] || '')];
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flat), 'By Day');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gridHeader, ...gridRows]), 'Calendar');
+  const shop = (document.getElementById('global-store') || {}).value || 'all';
+  const team = (document.getElementById('missing-team') || {}).value || 'all';
+  XLSX.writeFile(wb, `Sales_Calendar_${monthKey}_${team || 'all'}_${shop || 'all'}.xlsx`);
 }
 
 // ── Heatmap ──────────────────────────────────────────────────────
