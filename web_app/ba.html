@@ -203,26 +203,13 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 }
 .shift-btn.selected .label { color: var(--accent); }
 
-/* Date row */
-.date-row {
-  display: flex;
+.date-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  align-items: center;
   margin-bottom: 14px;
 }
-.date-row input { margin-bottom: 0; flex: 1; }
-.today-btn {
-  background: #f1f5f9;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 14px 12px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.today-btn:hover { background: #e2e8f0; }
+.date-range-row input { margin-bottom: 0; }
 
 .submit-btn {
   width: 100%;
@@ -355,10 +342,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <h3>Log a Sale 📋</h3>
 
     <label>Date</label>
-    <div class="date-row">
-      <input type="date" id="entry-date"/>
-      <button class="today-btn" onclick="setToday()">Today</button>
-    </div>
+    <input type="date" id="entry-date"/>
 
     <label>Shop</label>
     <select id="entry-store">
@@ -392,10 +376,15 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   <div class="form-card">
     <h3>Log Off / Leave 🗓️</h3>
 
-    <label>Date</label>
-    <div class="date-row">
-      <input type="date" id="leave-date"/>
-      <button class="today-btn" onclick="setToday()">Today</button>
+    <div class="date-range-row">
+      <div>
+        <label>From</label>
+        <input type="date" id="leave-from"/>
+      </div>
+      <div>
+        <label>Till</label>
+        <input type="date" id="leave-till"/>
+      </div>
     </div>
 
     <label>Status</label>
@@ -462,7 +451,7 @@ let currentProfile = null;
   document.getElementById('ba-name').textContent = profile.name;
   document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
 
-  setToday();
+  setDefaultDates();
   await loadHistory();
   await updateStats();
   await refreshTargetBanner();
@@ -585,12 +574,36 @@ async function refreshTargetBanner() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
-function setToday() {
-  // toISOString gives us "2026-04-23T..." — we take the first 10 chars for the date
-  const today = new Date().toISOString().slice(0, 10);
+function todayIso() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function setDefaultDates() {
+  const today = todayIso();
   document.getElementById('entry-date').value = today;
-  const leaveDate = document.getElementById('leave-date');
-  if (leaveDate) leaveDate.value = today;
+  const leaveFrom = document.getElementById('leave-from');
+  const leaveTill = document.getElementById('leave-till');
+  if (leaveFrom) leaveFrom.value = today;
+  if (leaveTill) leaveTill.value = today;
+}
+
+function enumerateDatesInclusive(start, end) {
+  const out = [];
+  if (!start || !end || start > end) return out;
+  const cur = new Date(start + 'T12:00:00');
+  const last = new Date(end + 'T12:00:00');
+  while (cur <= last) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const day = String(cur.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${day}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
 }
 
 // ── Submit a sale ─────────────────────────────────────────────────
@@ -662,7 +675,7 @@ async function submitSale() {
     document.getElementById('sales-amount').value = '';
     document.getElementById('items-sold').value   = '';
     document.getElementById('entry-shift').value  = '';
-    setToday();
+    setDefaultDates();
     await loadHistory();
     await updateStats();
     await refreshTargetBanner();
@@ -698,28 +711,38 @@ async function deleteSale(saleId) {
   await refreshTargetBanner();
 }
 
-// ── Submit an off/leave day ──────────────────────────────────────
+// ── Submit off/leave (single day or From–Till range) ─────────────
 async function submitLeave() {
-  const date = document.getElementById('leave-date').value;
+  const from = document.getElementById('leave-from').value;
+  const till = document.getElementById('leave-till').value;
   const status = document.getElementById('leave-type').value;
   const notes = document.getElementById('leave-notes').value.trim();
 
-  if (!date) return showMsg('Please select a leave/off date.', 'error');
+  if (!from || !till) return showMsg('Please select From and Till dates.', 'error');
+  if (till < from) return showMsg('Till date must be on or after From date.', 'error');
   if (!status) return showMsg('Please choose leave status.', 'error');
+
+  const dates = enumerateDatesInclusive(from, till);
+  if (!dates.length) return showMsg('Invalid date range.', 'error');
+  if (dates.length > 62) return showMsg('Maximum 62 days at once. Use a shorter range.', 'error');
 
   const btn = document.getElementById('leave-btn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  const { error } = await sb.from('ba_attendance_entries').upsert({
+  const rows = dates.map(entry_date => ({
     ba_id: currentUser.id,
     ba_name: currentProfile.name,
     team: currentProfile.team,
     store: currentProfile.store || null,
-    entry_date: date,
+    entry_date,
     status,
     notes: notes || null,
-  }, { onConflict: 'ba_id,entry_date' });
+  }));
+
+  const { error } = await sb.from('ba_attendance_entries').upsert(rows, {
+    onConflict: 'ba_id,entry_date',
+  });
 
   btn.disabled = false;
   btn.textContent = 'Save Status ✓';
@@ -727,9 +750,13 @@ async function submitLeave() {
   if (error) {
     showMsg('Error saving leave/off day: ' + error.message, 'error');
   } else {
-    showMsg('Leave/off day saved.', 'success');
+    const n = dates.length;
+    showMsg(
+      n === 1 ? 'Leave/off day saved.' : `Leave/off saved for ${n} days (${from} → ${till}).`,
+      'success'
+    );
     document.getElementById('leave-notes').value = '';
-    setToday();
+    setDefaultDates();
     await loadHistory();
   }
 }
@@ -865,7 +892,7 @@ document.getElementById('history-list').addEventListener('click', (e) => {
   }
 });
 
-// Explicit globals for other inline handlers (setToday, submitSale, signOut, …).
+// Explicit globals for other inline handlers (submitSale, signOut, …).
 window.deleteSale = deleteSale;
 </script>
 </body>
