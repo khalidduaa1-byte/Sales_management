@@ -763,6 +763,44 @@ function canonicalBaName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
 }
 
+function normalizeBaKey(name) {
+  return canonicalBaName(name).toLowerCase();
+}
+
+// Hidden from manager dashboard: test BA + manager accounts (not field BAs).
+const DASHBOARD_EXCLUDED_BA_IDS = new Set([
+  '8a106b5b-5f97-4239-a505-65fb65d6e7b9', // Duaa Khalid BA (test) — duaa.khalid@dolcegabbana.it
+  'd75bac7a-a81a-495c-8a1e-70d9b83871da', // duaa khalid — manager
+  'a70eaa58-deb8-4693-926b-a7e7c1fb4b95', // Rania Essam Eldin — manager
+]);
+const DASHBOARD_EXCLUDED_BA_NAME_KEYS = new Set([
+  'duaa khalid ba',
+  'duaa khalid',
+  'rania essam eldin',
+]);
+
+function isDashboardExcludedName(name) {
+  const key = normalizeBaKey(name);
+  if (!key) return false;
+  if (DASHBOARD_EXCLUDED_BA_NAME_KEYS.has(key)) return true;
+  // Test account variants: "Duaa Khalid BA", "Duaa Khalid", etc.
+  if (key.includes('duaa khalid')) return true;
+  return false;
+}
+
+function isDashboardExcludedProfile(p) {
+  if (!p) return true;
+  if (p.role === 'manager') return true;
+  if (p.id && DASHBOARD_EXCLUDED_BA_IDS.has(p.id)) return true;
+  return isDashboardExcludedName(p.name);
+}
+
+function isDashboardExcludedEntry(e) {
+  if (!e) return true;
+  if (e.ba_id && DASHBOARD_EXCLUDED_BA_IDS.has(e.ba_id)) return true;
+  return isDashboardExcludedName(e.ba_name);
+}
+
 /** ISO date string YYYY-MM-DD (handles DB dates and single-digit months from imports). */
 function normalizeEntryDate(d) {
   if (d == null || d === '') return '';
@@ -948,12 +986,14 @@ async function loadTeamHeadcount() {
   const { data, error } = await sb.from('profiles').select('id, name, team, store, role').eq('role', 'ba');
   if (error) return;
   const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
-  allBaProfiles = (data || []).map(p => ({
-    id: p.id,
-    name: canonicalBaName(p.name),
-    team: canonicalTeamName(p.team),
-    store: String(p.store || '').trim(),
-  }));
+  allBaProfiles = (data || [])
+    .filter(p => !isDashboardExcludedProfile(p))
+    .map(p => ({
+      id: p.id,
+      name: canonicalBaName(p.name),
+      team: canonicalTeamName(p.team),
+      store: String(p.store || '').trim(),
+    }));
   allBaProfiles.forEach(p => {
     if (counts[p.team] !== undefined) counts[p.team] += 1;
   });
@@ -1016,23 +1056,27 @@ async function loadAll() {
   // Duplicates should be cleaned at source (database) instead of being
   // silently dropped in the UI.
   dedupeDropped = 0;
-  allEntries = rawEntries;
+  allEntries = rawEntries.filter(e => !isDashboardExcludedEntry(e));
 
   const { data: attendanceData, error: attendanceError } = await fetchAllTableRows('ba_attendance_entries', 'entry_date', false);
   if (attendanceError) {
     attendanceEntries = [];
     console.warn('ba_attendance_entries not available:', attendanceError.message);
   } else {
-    attendanceEntries = (attendanceData || []).map(e => ({
-      ...e,
-      entry_date: normalizeEntryDate(e.entry_date),
-      team: canonicalTeamName(e.team),
-      ba_name: canonicalBaName(e.ba_name),
-    }));
+    attendanceEntries = (attendanceData || [])
+      .map(e => ({
+        ...e,
+        entry_date: normalizeEntryDate(e.entry_date),
+        team: canonicalTeamName(e.team),
+        ba_name: canonicalBaName(e.ba_name),
+      }))
+      .filter(e => !isDashboardExcludedEntry(e));
   }
 
   // Populate BA filter
-  const names = [...new Set(allEntries.map(e => e.ba_name))].sort();
+  const names = [...new Set(allEntries.map(e => e.ba_name))]
+    .filter(n => !isDashboardExcludedName(n))
+    .sort();
   const fba = document.getElementById('f-ba');
   fba.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
 
@@ -1065,7 +1109,7 @@ function rebuildDailyBaDropdown() {
   const names = [...new Set([
     ...allEntries.map(e => e.ba_name),
     ...attendanceEntries.map(e => e.ba_name),
-  ])].sort();
+  ])].filter(n => !isDashboardExcludedName(n)).sort();
   sel.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
   if (names.includes(cur)) sel.value = cur;
 }
@@ -1077,7 +1121,7 @@ function rebuildProfileBaDropdown() {
   const names = [...new Set([
     ...allEntries.map(e => e.ba_name),
     ...attendanceEntries.map(e => e.ba_name),
-  ])].sort();
+  ])].filter(n => !isDashboardExcludedName(n)).sort();
   sel.innerHTML = '<option value="">Select BA</option>' + names.map(n => `<option>${n}</option>`).join('');
   if (names.includes(cur)) sel.value = cur;
 }
@@ -1996,8 +2040,9 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
   const bas = [...allBaProfiles];
   allEntries.forEach(e => {
     if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+    if (isDashboardExcludedEntry(e)) return;
     const name = canonicalBaName(e.ba_name);
-    if (!name || seen.has(name)) return;
+    if (!name || seen.has(name) || isDashboardExcludedName(name)) return;
     if (bas.some(p => p.name === name || (e.ba_id && p.id === e.ba_id))) return;
     seen.add(name);
     bas.push({
@@ -2010,6 +2055,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
 
   const rows = [];
   bas.forEach(profile => {
+    if (isDashboardExcludedProfile(profile)) return;
     if (teamFilter && profile.team !== teamFilter) return;
     if (!baPassesShopFilter(profile, shopLower, monthKey)) return;
 
