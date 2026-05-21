@@ -413,6 +413,7 @@ const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
   {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     global: {
       fetch: (url, options = {}) =>
         fetch(url, { ...options, cache: 'no-store' }),
@@ -426,22 +427,26 @@ let currentProfile = null;
 // ── On page load ──────────────────────────────────────────────────
 // getSession checks if the user is logged in (Supabase stores a token in the browser)
 (async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
+  const { data: { user }, error: authErr } = await sb.auth.getUser();
+  if (authErr || !user) { window.location.href = 'index.html'; return; }
 
-  currentUser = session.user;
+  currentUser = user;
 
-  // Fetch their profile from our profiles table
-  const { data: profile } = await sb
+  const { data: profile, error: pErr } = await sb
     .from('profiles')
     .select('*')
     .eq('id', currentUser.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile || profile.role !== 'ba') {
-    if (profile && profile.role === 'manager') { window.location.href = 'manager.html'; return; }
+  if (pErr || !profile) {
     await sb.auth.signOut();
-    window.location.href = 'index.html?error=setup';
+    window.location.href = 'index.html?error=profile&detail=' + encodeURIComponent(pErr?.message || 'Profile not found');
+    return;
+  }
+  if (profile.role !== 'ba') {
+    if (profile.role === 'manager') { window.location.href = 'manager.html'; return; }
+    await sb.auth.signOut();
+    window.location.href = 'index.html?error=profile&detail=' + encodeURIComponent('Invalid role: ' + profile.role);
     return;
   }
 

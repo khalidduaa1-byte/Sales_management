@@ -702,7 +702,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 );
 
 const TARGETS = {
@@ -806,14 +807,23 @@ async function fetchAllTableRows(table, orderCol, ascending) {
 // ── Auth ─────────────────────────────────────────────────────────
 (async () => {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
+    const { data: { user }, error: authErr } = await sb.auth.getUser();
+    if (authErr || !user) { window.location.href = 'index.html'; return; }
 
     const { data: profile, error: pErr } = await sb.from('profiles')
-      .select('name,role').eq('id', session.user.id).single();
-    if (pErr || !profile) { await sb.auth.signOut(); window.location.href = 'index.html?error=setup'; return; }
-    if (profile.role === 'ba')       { window.location.href = 'ba.html'; return; }
-    if (profile.role !== 'manager')  { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+      .select('name,role').eq('id', user.id).maybeSingle();
+    if (pErr || !profile) {
+      await sb.auth.signOut();
+      const detail = encodeURIComponent(pErr?.message || 'Profile not found');
+      window.location.href = 'index.html?error=profile&detail=' + detail;
+      return;
+    }
+    if (profile.role === 'ba') { window.location.href = 'ba.html'; return; }
+    if (profile.role !== 'manager') {
+      await sb.auth.signOut();
+      window.location.href = 'index.html?error=profile&detail=' + encodeURIComponent('Invalid role: ' + profile.role);
+      return;
+    }
 
     document.getElementById('manager-name').textContent = profile.name || 'Manager';
     buildMonthFilter();

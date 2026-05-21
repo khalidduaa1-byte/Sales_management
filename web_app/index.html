@@ -205,14 +205,31 @@ input::placeholder { color: #94a3b8; }
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );
 
-// ── Show error from redirect if setup.sql wasn't run ─────────────
-const urlError = new URLSearchParams(window.location.search).get('error');
-if (urlError === 'setup') {
+function clearLoginErrorFromUrl() {
+  const path = window.location.pathname || '/';
+  if (window.location.search) window.history.replaceState({}, '', path);
+}
+
+// ── Show error when bounced back from ba.html / manager.html ─────
+const urlParams = new URLSearchParams(window.location.search);
+const urlError = urlParams.get('error');
+const urlDetail = urlParams.get('detail');
+if (urlError) {
   const m = document.getElementById('msg');
-  m.textContent = 'Your account was created but the database tables are missing. Ask the admin to run setup.sql in Supabase first.';
+  const detail = urlDetail ? decodeURIComponent(urlDetail) : '';
+  m.textContent = urlError === 'profile'
+    ? ('Could not load your profile after sign-in. ' + (detail || 'Check profiles row + RLS in Supabase.'))
+    : 'Sign-in failed after redirect. Try again, or use an incognito window.';
   m.className = 'msg error';
   m.style.display = 'block';
 }
@@ -313,17 +330,27 @@ async function loadRegistrationNames() {
   onNameSelectChange();
 }
 
+// "mohamed  ahmed" → "Mohamed Ahmed", "anne-marie" → "Anne-Marie", "o'brien" → "O'Brien".
+// Linking uses normalize_ba_name() server-side (lowercases everything), so casing here only affects display.
+function titleCaseName(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/(^|[\s'\-])([a-zà-ÿ])/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
 function resolveRegistrationIdentity() {
   const pick = document.getElementById('name-select').value;
   if (pick === '__new__') {
-    const name = document.getElementById('name-custom').value.trim();
+    const name = titleCaseName(document.getElementById('name-custom').value);
     const team = document.getElementById('team').value;
     return { name, team, fromRoster: false };
   }
   if (!pick) return { name: '', team: '', fromRoster: false };
   const opt = document.getElementById('name-select').selectedOptions[0];
   const team = (opt && opt.dataset.team) || document.getElementById('team').value;
-  return { name: pick, team, fromRoster: true };
+  return { name: titleCaseName(pick), team, fromRoster: true };
 }
 
 // ── Form submit ───────────────────────────────────────────────────
@@ -339,10 +366,13 @@ async function handleSubmit(e) {
 
   try {
     if (mode === 'login') {
-      // signInWithPassword checks email + password against Supabase auth
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      await redirectByRole(data.user.id);
+      // Wait until JWT is on the client before reading profiles (avoids false "missing profile").
+      const { data: { user }, error: userErr } = await sb.auth.getUser();
+      if (userErr || !user) throw userErr || new Error('Sign-in succeeded but session was not ready. Try again.');
+      clearLoginErrorFromUrl();
+      await redirectByRole(user.id);
 
     } else {
       const { name, team, fromRoster } = resolveRegistrationIdentity();
@@ -374,17 +404,26 @@ async function handleSubmit(e) {
 
 // ── Redirect based on role ────────────────────────────────────────
 async function redirectByRole(userId) {
-  // Look up their profile to find out if they're a manager or BA
-  const { data: profile } = await sb
+  const { data: profile, error } = await sb
     .from('profiles')
     .select('role')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
-  if (profile?.role === 'manager') {
+  if (error || !profile) {
+    await sb.auth.signOut();
+    const detail = encodeURIComponent(error?.message || 'no profile row');
+    window.location.href = 'index.html?error=profile&detail=' + detail;
+    return;
+  }
+
+  if (profile.role === 'manager') {
     window.location.href = 'manager.html';
-  } else {
+  } else if (profile.role === 'ba') {
     window.location.href = 'ba.html';
+  } else {
+    await sb.auth.signOut();
+    showMsg('Your profile role is invalid. Ask admin to set role to manager or ba.', 'error');
   }
 }
 
