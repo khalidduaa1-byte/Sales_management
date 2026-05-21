@@ -439,9 +439,12 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
       <select class="f-sel" id="global-month" onchange="applyFilters()" style="min-width:150px"></select>
-      <span class="sec-lbl" style="margin:0">Shop</span>
-      <select class="f-sel" id="global-store" onchange="onGlobalStoreChange()" style="min-width:160px">
-        <option value="">All Shops</option>
+      <span class="sec-lbl" style="margin:0">City</span>
+      <select class="f-sel" id="global-store" onchange="onGlobalStoreChange()" style="min-width:160px" title="Filter by city. BA entries keep terminal / shop detail; terminal-level filter coming later.">
+        <option value="">All cities</option>
+        <option value="Cairo">Cairo</option>
+        <option value="Sharm">Sharm</option>
+        <option value="Hurgadah">Hurgadah</option>
       </select>
     </div>
   </div>
@@ -758,6 +761,32 @@ function canonicalTeamName(team) {
   // Defensive normalization for historical/manual spelling variants.
   if (['hurgadah', 'hurghada', 'hurgahda', 'hurgada'].includes(key)) return 'Hurgadah';
   return raw || '—';
+}
+
+const MANAGER_CITY_FILTERS = ['Cairo', 'Sharm', 'Hurgadah'];
+
+/** Manager dashboard city filter — groups T1/T2/T3 → Cairo, Hurghada shops → Hurgadah. */
+function storeToManagerCity(store, team) {
+  const t = canonicalTeamName(team);
+  if (MANAGER_CITY_FILTERS.includes(t)) return t;
+  const s = String(store || '').trim().toLowerCase();
+  if (!s) return t || '';
+  if (s.includes('cairo') || /^terminal\s*\d/.test(s)) return 'Cairo';
+  if (s.includes('sharm')) return 'Sharm';
+  if (s.includes('hurgh') || s.includes('hurgad')) return 'Hurgadah';
+  const fromStore = canonicalTeamName(store);
+  return MANAGER_CITY_FILTERS.includes(fromStore) ? fromStore : '';
+}
+
+function getManagerCityFilter() {
+  const raw = (document.getElementById('global-store')?.value || '').trim();
+  return raw ? canonicalTeamName(raw) : '';
+}
+
+function entryMatchesManagerCityFilter(entry, cityFilter) {
+  if (!cityFilter) return true;
+  if (canonicalTeamName(entry.team) === cityFilter) return true;
+  return storeToManagerCity(entry.store, entry.team) === cityFilter;
 }
 
 /** Same person split across rows if Excel/import had extra spaces — merge for totals. */
@@ -1116,15 +1145,10 @@ async function loadAll() {
 }
 
 function rebuildStoreDropdowns() {
-  const stores = [...new Set([
-    ...allEntries.map(e => (e.store || '').trim()),
-    ...attendanceEntries.map(e => (e.store || '').trim()),
-  ].filter(Boolean))].sort();
-  const curGlobal = document.getElementById('global-store').value;
   const g = document.getElementById('global-store');
-  const opts = '<option value="">All Shops</option>' + stores.map(s => `<option>${s}</option>`).join('');
-  g.innerHTML = opts;
-  if (stores.includes(curGlobal)) g.value = curGlobal;
+  if (!g) return;
+  const cur = g.value;
+  if (!MANAGER_CITY_FILTERS.includes(cur) && cur !== '') g.value = '';
 }
 
 function rebuildDailyBaDropdown() {
@@ -1212,12 +1236,11 @@ function filtered() {
   const team  = document.getElementById('f-team').value;
   const monthRaw = getGlobalMonthRaw();
   const ba    = document.getElementById('f-ba').value;
-  const shop  = (document.getElementById('global-store').value || '').trim().toLowerCase();
+  const cityFilter = getManagerCityFilter();
   return allEntries.filter(e => {
     if (team  && e.team    !== team)   return false;
     if (ba    && e.ba_name !== ba)     return false;
-    const rowShop = (e.store || '').trim().toLowerCase();
-    if (shop  && rowShop !== shop) return false;
+    if (cityFilter && !entryMatchesManagerCityFilter(e, cityFilter)) return false;
     if (monthRaw && monthKeyFromEntryDate(e.entry_date) !== monthRaw) return false;
     return true;
   });
@@ -1231,10 +1254,10 @@ function rollupEntries() {
 }
 
 function rollupEntriesByShop() {
-  const shop = (document.getElementById('global-store').value || '').trim().toLowerCase();
+  const cityFilter = getManagerCityFilter();
   const monthScoped = rollupEntries();
-  if (!shop) return monthScoped;
-  return monthScoped.filter(e => ((e.store || '').trim().toLowerCase()) === shop);
+  if (!cityFilter) return monthScoped;
+  return monthScoped.filter(e => entryMatchesManagerCityFilter(e, cityFilter));
 }
 
 function applyFilters() {
@@ -1513,8 +1536,8 @@ function renderCommissions() {
     return;
   }
   const total = rows.reduce((s, r) => s + r.commission, 0);
-  const selectedShop = (document.getElementById('global-store').value || '').trim();
-  const shopScopeLabel = selectedShop ? `shop: ${selectedShop}` : 'all shops';
+  const selectedShop = getManagerCityFilter();
+  const shopScopeLabel = selectedShop ? `city: ${selectedShop}` : 'all cities';
   setText('comm-total', '$' + fmt(total));
   setText('comm-sub', `Commission month: ${monthLabel(getSelectedMonth())} (${shopScopeLabel}) • Slabs: 70%=0.8%, 80%=1.0%, 90%=1.1%, 100%=1.3%.`);
 
@@ -1726,8 +1749,9 @@ function dailyRowsForExport() {
     attRows = attRows.filter(e => e.team === team);
   }
   if (shop) {
-    salesRows = salesRows.filter(e => (e.store || '') === shop);
-    attRows = attRows.filter(e => (e.store || '') === shop);
+    const cityFilter = canonicalTeamName(shop);
+    salesRows = salesRows.filter(e => entryMatchesManagerCityFilter(e, cityFilter));
+    attRows = attRows.filter(e => entryMatchesManagerCityFilter(e, cityFilter));
   }
   if (ba) {
     salesRows = salesRows.filter(e => e.ba_name === ba);
@@ -1997,15 +2021,13 @@ function entryMatchesProfile(entry, profile) {
   return canonicalBaName(entry.ba_name) === profile.name;
 }
 
-function baPassesShopFilter(profile, shopLower, monthKey) {
-  if (!shopLower) return true;
-  const pShop = (profile.store || '').trim().toLowerCase();
-  if (pShop && pShop === shopLower) return true;
-  if (pShop && pShop !== shopLower) return false;
+function baPassesShopFilter(profile, cityFilter, monthKey) {
+  if (!cityFilter) return true;
+  if (canonicalTeamName(profile.team) === cityFilter) return true;
   return allEntries.some(e =>
     monthKeyFromEntryDate(e.entry_date) === monthKey
     && entryMatchesProfile(e, profile)
-    && (e.store || '').trim().toLowerCase() === shopLower
+    && storeToManagerCity(e.store, e.team) === cityFilter
   );
 }
 
@@ -2015,7 +2037,7 @@ function getProfileAttendanceStatus(profile, date, attById, attByName) {
   return (idMap && idMap.get(date)) || (nameMap && nameMap.get(date)) || null;
 }
 
-function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
+function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
   const { start, end, checkEnd, isCurrent } = monthCalendarRange(monthKey);
   const dates = enumerateDatesInclusive(start, end);
   if (!dates.length) return { dates: [], rows: [], start, end, checkEnd, isCurrent };
@@ -2039,7 +2061,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
   allEntries.forEach(e => {
     if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
     if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
-    if (shopLower && (e.store || '').trim().toLowerCase() !== shopLower) return;
+    if (cityFilter && storeToManagerCity(e.store, e.team) !== cityFilter) return;
     const d = normalizeEntryDate(e.entry_date);
     if (e.ba_id) addSale(salesById, e.ba_id, d);
     addSale(salesByName, canonicalBaName(e.ba_name), d);
@@ -2048,7 +2070,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
   attendanceEntries.forEach(e => {
     if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
     if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
-    if (shopLower && (e.store || '').trim().toLowerCase() !== shopLower) return;
+    if (cityFilter && storeToManagerCity(e.store, e.team) !== cityFilter) return;
     const d = normalizeEntryDate(e.entry_date);
     const status = e.status || 'off_day';
     if (e.ba_id) addAtt(attById, e.ba_id, d, status);
@@ -2076,7 +2098,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, shopLower) {
   bas.forEach(profile => {
     if (isDashboardExcludedProfile(profile)) return;
     if (teamFilter && profile.team !== teamFilter) return;
-    if (!baPassesShopFilter(profile, shopLower, monthKey)) return;
+    if (!baPassesShopFilter(profile, cityFilter, monthKey)) return;
 
     const salesDates = new Set([
       ...(salesById.get(profile.id) || []),
@@ -2221,8 +2243,8 @@ function renderMissingSubmissions() {
   }
 
   const teamFilter = (document.getElementById('missing-team') || {}).value || '';
-  const shopLower = (document.getElementById('global-store').value || '').trim().toLowerCase();
-  const model = buildMissingSubmissionModel(monthKey, teamFilter, shopLower);
+  const cityFilter = getManagerCityFilter();
+  const model = buildMissingSubmissionModel(monthKey, teamFilter, cityFilter);
   lastMissingModel = model;
   lastMissingRows = model.rows;
 
