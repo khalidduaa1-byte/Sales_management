@@ -741,6 +741,8 @@ let lastCommissionRows = [];
 let dedupeDropped = 0;
 let teamHeadcount = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
 let allBaProfiles = [];
+/** ba_id → name from profiles (signup / registration name). */
+let baProfileNameById = new Map();
 let lastMissingRows = [];
 let lastMissingModel = null;
 let missingViewMode = 'calendar';
@@ -761,6 +763,30 @@ function canonicalTeamName(team) {
 /** Same person split across rows if Excel/import had extra spaces — merge for totals. */
 function canonicalBaName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
+}
+
+function rebuildBaProfileNameMap() {
+  baProfileNameById = new Map();
+  allBaProfiles.forEach(p => {
+    if (p.id) baProfileNameById.set(p.id, p.name);
+  });
+}
+
+/** Prefer the name the BA chose at registration when a row is linked to their account. */
+function registeredBaName(entry) {
+  if (entry?.ba_id && baProfileNameById.has(entry.ba_id)) {
+    return baProfileNameById.get(entry.ba_id);
+  }
+  return canonicalBaName(entry?.ba_name);
+}
+
+/** Names for filters: registered BAs first; Excel-only names only if still unlinked. */
+function dashboardBaNameList() {
+  const registered = allBaProfiles.map(p => p.name);
+  const unlinkedOnly = [...new Set(
+    allEntries.filter(e => !e.ba_id).map(e => e.ba_name),
+  )].filter(n => n && !isDashboardExcludedName(n));
+  return [...new Set([...registered, ...unlinkedOnly])].sort();
 }
 
 function normalizeBaKey(name) {
@@ -998,6 +1024,7 @@ async function loadTeamHeadcount() {
     if (counts[p.team] !== undefined) counts[p.team] += 1;
   });
   teamHeadcount = counts;
+  rebuildBaProfileNameMap();
 }
 
 async function loadMonthlyTargets() {
@@ -1048,7 +1075,7 @@ async function loadAll() {
     ...e,
     entry_date: normalizeEntryDate(e.entry_date),
     team: canonicalTeamName(e.team),
-    ba_name: canonicalBaName(e.ba_name),
+    ba_name: registeredBaName(e),
     working_days: e.working_days || 1,
     qpd: e.items_sold / (e.working_days || 1),
   }));
@@ -1068,15 +1095,13 @@ async function loadAll() {
         ...e,
         entry_date: normalizeEntryDate(e.entry_date),
         team: canonicalTeamName(e.team),
-        ba_name: canonicalBaName(e.ba_name),
+        ba_name: registeredBaName(e),
       }))
       .filter(e => !isDashboardExcludedEntry(e));
   }
 
-  // Populate BA filter
-  const names = [...new Set(allEntries.map(e => e.ba_name))]
-    .filter(n => !isDashboardExcludedName(n))
-    .sort();
+  // Populate BA filter (registration names, not Excel roster short names)
+  const names = dashboardBaNameList();
   const fba = document.getElementById('f-ba');
   fba.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
 
@@ -1106,10 +1131,7 @@ function rebuildDailyBaDropdown() {
   const sel = document.getElementById('daily-ba');
   if (!sel) return;
   const cur = sel.value;
-  const names = [...new Set([
-    ...allEntries.map(e => e.ba_name),
-    ...attendanceEntries.map(e => e.ba_name),
-  ])].filter(n => !isDashboardExcludedName(n)).sort();
+  const names = dashboardBaNameList();
   sel.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
   if (names.includes(cur)) sel.value = cur;
 }
@@ -1118,10 +1140,7 @@ function rebuildProfileBaDropdown() {
   const sel = document.getElementById('profile-ba');
   if (!sel) return;
   const cur = sel.value;
-  const names = [...new Set([
-    ...allEntries.map(e => e.ba_name),
-    ...attendanceEntries.map(e => e.ba_name),
-  ])].filter(n => !isDashboardExcludedName(n)).sort();
+  const names = dashboardBaNameList();
   sel.innerHTML = '<option value="">Select BA</option>' + names.map(n => `<option>${n}</option>`).join('');
   if (names.includes(cur)) sel.value = cur;
 }
