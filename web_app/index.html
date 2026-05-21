@@ -162,8 +162,18 @@ input::placeholder { color: #94a3b8; }
 
     <!-- Register-only fields -->
     <div id="register-fields">
-      <label>Your Full Name</label>
-      <input type="text" id="name" placeholder="e.g. Samah Ali"/>
+      <label>Your name on the team list</label>
+      <select id="name-select" onchange="onNameSelectChange()">
+        <option value="">Loading names…</option>
+      </select>
+      <p id="name-hint" style="font-size:11px;color:var(--muted);margin:-8px 0 12px;line-height:1.4">
+        Choose the name that matches your imported sales history — not a new spelling.
+      </p>
+
+      <div id="name-custom-wrap" style="display:none">
+        <label>New BA — full name</label>
+        <input type="text" id="name-custom" placeholder="e.g. Samah Ali"/>
+      </div>
 
       <div id="team-store-fields">
         <label>Team</label>
@@ -217,6 +227,8 @@ if (urlError === 'setup') {
 
 // ── Tab switching ─────────────────────────────────────────────────
 let mode = 'login';
+let registrationNamesLoaded = false;
+
 function switchTab(m) {
   mode = m;
   document.getElementById('tab-login').classList.toggle('active', m === 'login');
@@ -224,6 +236,94 @@ function switchTab(m) {
   document.getElementById('register-fields').style.display = m === 'register' ? 'block' : 'none';
   document.getElementById('submit-btn').textContent = m === 'login' ? 'Sign In' : 'Create Account';
   clearMsg();
+  if (m === 'register') loadRegistrationNames();
+}
+
+function onNameSelectChange() {
+  const sel = document.getElementById('name-select');
+  const customWrap = document.getElementById('name-custom-wrap');
+  const teamFields = document.getElementById('team-store-fields');
+  const val = sel.value;
+
+  if (val === '__new__') {
+    customWrap.style.display = 'block';
+    teamFields.style.display = 'block';
+    return;
+  }
+
+  customWrap.style.display = 'none';
+  const opt = sel.selectedOptions[0];
+  const rosterTeam = opt && opt.dataset.team;
+  if (val && rosterTeam) {
+    document.getElementById('team').value = rosterTeam;
+    teamFields.style.display = 'none';
+  } else {
+    teamFields.style.display = 'block';
+  }
+}
+
+async function loadRegistrationNames() {
+  const sel = document.getElementById('name-select');
+  const hint = document.getElementById('name-hint');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">Loading names…</option>';
+  const { data, error } = await sb.rpc('get_registration_ba_names');
+
+  sel.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Choose your name…';
+  sel.appendChild(placeholder);
+
+  if (error) {
+    if (hint) {
+      hint.textContent = 'Could not load team list. Pick team below and type your name under “not on the list”.';
+    }
+    const customWrap = document.getElementById('name-custom-wrap');
+    if (customWrap) customWrap.style.display = 'block';
+    document.getElementById('team-store-fields').style.display = 'block';
+    const o = document.createElement('option');
+    o.value = '__new__';
+    o.textContent = 'Type my name (list unavailable)';
+    sel.appendChild(o);
+    registrationNamesLoaded = true;
+    return;
+  }
+
+  (data || []).forEach(row => {
+    const o = document.createElement('option');
+    o.value = row.ba_name;
+    o.textContent = `${row.ba_name} (${row.team})`;
+    o.dataset.team = row.team;
+    sel.appendChild(o);
+  });
+
+  const neu = document.createElement('option');
+  neu.value = '__new__';
+  neu.textContent = 'My name is not on the list (new BA)';
+  sel.appendChild(neu);
+
+  if (hint) {
+    hint.textContent = data && data.length
+      ? 'Pick your exact roster name so past sales link to your account.'
+      : 'No unclaimed names found — use “not on the list” if you are a new BA.';
+  }
+  registrationNamesLoaded = true;
+  onNameSelectChange();
+}
+
+function resolveRegistrationIdentity() {
+  const pick = document.getElementById('name-select').value;
+  if (pick === '__new__') {
+    const name = document.getElementById('name-custom').value.trim();
+    const team = document.getElementById('team').value;
+    return { name, team, fromRoster: false };
+  }
+  if (!pick) return { name: '', team: '', fromRoster: false };
+  const opt = document.getElementById('name-select').selectedOptions[0];
+  const team = (opt && opt.dataset.team) || document.getElementById('team').value;
+  return { name: pick, team, fromRoster: true };
 }
 
 // ── Form submit ───────────────────────────────────────────────────
@@ -245,22 +345,24 @@ async function handleSubmit(e) {
       await redirectByRole(data.user.id);
 
     } else {
-      const name  = document.getElementById('name').value.trim();
+      const { name, team, fromRoster } = resolveRegistrationIdentity();
       const role  = 'ba';
-      const team  = document.getElementById('team').value;
       const store = null;
 
-      if (!name) throw new Error('Please enter your name.');
+      if (!name) throw new Error('Please choose your name from the team list, or type it under “not on the list”.');
+      if (!team) throw new Error('Please select your team.');
 
-      // signUp creates the account. The metadata (name, role, team, store)
-      // gets passed to our trigger function in the database to create the profile row.
-      const { data, error } = await sb.auth.signUp({
+      // signUp creates the account. The trigger links imported sales rows with the same name.
+      const { error } = await sb.auth.signUp({
         email, password,
         options: { data: { name, role, team, store } }
       });
       if (error) throw error;
 
-      showMsg('Account created! Check your email to confirm, then sign in.', 'success');
+      const extra = fromRoster
+        ? ' Your past sales will link to this account after you confirm email.'
+        : '';
+      showMsg('Account created! Check your email to confirm, then sign in.' + extra, 'success');
     }
   } catch (err) {
     showMsg(err.message, 'error');

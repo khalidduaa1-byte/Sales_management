@@ -447,6 +447,9 @@ let currentProfile = null;
 
   currentProfile = profile;
 
+  // Link imported sales rows (ba_id null) that match this profile name.
+  sb.rpc('link_my_legacy_rows').then(() => {}).catch(() => {});
+
   // Update the header
   document.getElementById('ba-name').textContent = profile.name;
   document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
