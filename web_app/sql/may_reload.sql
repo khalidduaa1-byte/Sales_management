@@ -61,6 +61,18 @@ where entry_date between '2026-05-01' and '2026-05-31'
 -- 4) PAUSE — Import both CSVs into staging tables (Table Editor → Import)
 -- =============================================================================
 
+-- Roster name match (Mamdouh ↔ Mamdouh Mohamed) — needs normalize_ba_name from merge_ba_accounts.sql §1
+create or replace function public.import_roster_matches_name(p_entry_name text, p_roster_name text)
+returns boolean
+language sql
+immutable
+as $$
+  select
+    public.normalize_ba_name(coalesce(p_entry_name, '')) = public.normalize_ba_name(coalesce(p_roster_name, ''))
+    or public.normalize_ba_name(public.import_roster_name_for_profile(p_entry_name))
+       = public.normalize_ba_name(coalesce(p_roster_name, ''));
+$$;
+
 -- =============================================================================
 -- 5) MERGE staging → production (ADD ONLY — safe with BAs using the app)
 -- =============================================================================
@@ -88,8 +100,7 @@ where not exists (
   where e.entry_date = s.entry_date::date
     and lower(trim(coalesce(e.store, ''))) = lower(trim(s.store))
     and lower(trim(coalesce(e.shift, ''))) = lower(trim(s.shift))
-    and lower(regexp_replace(trim(coalesce(p.name, e.ba_name)), '\s+', ' ', 'g'))
-        = lower(regexp_replace(trim(s.ba_name), '\s+', ' ', 'g'))
+    and public.import_roster_matches_name(coalesce(p.name, e.ba_name), s.ba_name)
 )
 on conflict ((lower(ba_name)), entry_date, store, shift)
   where (ba_id is null)
@@ -111,8 +122,7 @@ where not exists (
   from public.ba_attendance_entries e
   left join public.profiles p on p.id = e.ba_id
   where e.entry_date = a.entry_date::date
-    and lower(regexp_replace(trim(coalesce(p.name, e.ba_name)), '\s+', ' ', 'g'))
-        = lower(regexp_replace(trim(a.ba_name), '\s+', ' ', 'g'))
+    and public.import_roster_matches_name(coalesce(p.name, e.ba_name), a.ba_name)
 );
 
 -- =============================================================================
