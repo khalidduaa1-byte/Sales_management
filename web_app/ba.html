@@ -567,6 +567,18 @@ function sumSalesAmount(rows) {
   return rows.reduce((s, r) => s + Number(r.sales_amount || 0), 0);
 }
 
+/** Month sales for this BA — needs date/shop/shift for dedupe (not amount-only). */
+async function fetchMyDedupedMonthSales(monthKey) {
+  const { start, end } = monthDateBounds(monthKey);
+  const { data, error } = await sb
+    .from('sales_entries')
+    .select('id, entry_date, store, shift, sales_amount, items_sold, ba_id, created_at')
+    .gte('entry_date', start)
+    .lte('entry_date', end);
+  if (error) return { rows: [], error };
+  return { rows: dedupeMySalesRows(data || []), error: null };
+}
+
 /** Personal goal for the month (matches manager logic: per_ba vs team_total + headcount). */
 async function computePersonalMonthlyTarget(monthKey, teamCanon) {
   const { data: tRow, error: tErr } = await sb
@@ -609,16 +621,12 @@ async function refreshTargetBanner() {
   wrap.style.display = '';
 
   const monthKey = selectedMonthKey();
-  const { start, end } = monthDateBounds(monthKey);
   const monthTitle = document.getElementById('target-month-title');
   if (monthTitle) monthTitle.textContent = `Monthly target — ${formatMonthLabel(monthKey)}`;
 
   const [{ goal, mode, teamGoal, teamBas }, salesRes] = await Promise.all([
     computePersonalMonthlyTarget(monthKey, team),
-    sb.from('sales_entries')
-      .select('sales_amount')
-      .gte('entry_date', start)
-      .lte('entry_date', end),
+    fetchMyDedupedMonthSales(monthKey),
   ]);
 
   if (salesRes.error) {
@@ -629,7 +637,7 @@ async function refreshTargetBanner() {
     return;
   }
 
-  const monthSales = dedupeMySalesRows(salesRes.data || []);
+  const monthSales = salesRes.rows;
   const mySales = sumSalesAmount(monthSales);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
@@ -962,16 +970,9 @@ async function loadHistory() {
 // ── Update stats ──────────────────────────────────────────────────
 async function updateStats() {
   const monthKey = selectedMonthKey();
-  const { start, end } = monthDateBounds(monthKey);
+  const { rows: monthSales, error } = await fetchMyDedupedMonthSales(monthKey);
 
-  const { data: entries, error } = await sb
-    .from('sales_entries')
-    .select('sales_amount, items_sold, entry_date')
-    .gte('entry_date', start)
-    .lte('entry_date', end);
-
-  if (error || !entries) return;
-  const monthSales = dedupeMySalesRows(entries);
+  if (error) return;
   const totalSales = sumSalesAmount(monthSales);
   const totalItems = monthSales.reduce((s, e) => s + Number(e.items_sold || 0), 0);
 
