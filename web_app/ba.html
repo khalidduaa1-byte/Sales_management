@@ -383,7 +383,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 
   <!-- Leave / Off days -->
   <div class="form-card">
-    <h3>Log Off / Leave 🗓️</h3>
+    <h3>Log Off / Leave / Public Holiday 🗓️</h3>
 
     <div class="date-range-row">
       <div>
@@ -400,6 +400,8 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <select id="leave-type">
       <option value="off_day">Off Day</option>
       <option value="annual_leave">Annual Leave</option>
+      <option value="public_holiday">Public Holiday</option>
+      <option value="sick_leave">Sick Leave</option>
     </select>
 
     <label>Notes (Optional)</label>
@@ -461,8 +463,10 @@ let currentProfile = null;
 
   currentProfile = profile;
 
-  // Link imported sales rows (ba_id null) that match this profile name.
-  sb.rpc('link_my_legacy_rows').then(() => {}).catch(() => {});
+  // Attach Excel imports to this account before we sum sales (avoids double-count in UI).
+  try {
+    await sb.rpc('link_my_legacy_rows');
+  } catch (_) { /* non-fatal */ }
 
   // Update the header
   document.getElementById('ba-name').textContent = profile.name;
@@ -499,6 +503,52 @@ function monthDateBounds(monthKey) {
 function formatMonthLabel(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+function attendanceStatusLabel(status) {
+  switch (status) {
+    case 'annual_leave': return 'Annual Leave';
+    case 'off_day': return 'Off Day';
+    case 'public_holiday': return 'Public Holiday';
+    case 'sick_leave': return 'Sick Leave';
+    case 'other': return 'Sick Leave'; /* legacy Excel imports used status "other" */
+    default: return 'Leave';
+  }
+}
+
+/** Same day + shop + shift must count once (linked import + legacy name row = duplicate). */
+function salesShiftKey(e) {
+  const store = String(e.store || '').trim().toLowerCase();
+  const shift = String(e.shift || '').trim().toLowerCase();
+  return `${e.entry_date}|${store}|${shift}`;
+}
+
+function salesRowRank(e) {
+  const uid = currentUser && currentUser.id ? String(currentUser.id) : '';
+  const linked = uid && e.ba_id && String(e.ba_id) === uid;
+  const amount = Number(e.sales_amount || 0);
+  return (linked ? 4 : 0) + (amount > 0 ? 2 : 0);
+}
+
+function dedupeMySalesRows(rows) {
+  const map = new Map();
+  (rows || []).forEach(e => {
+    const key = salesShiftKey(e);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, e);
+      return;
+    }
+    const rNew = salesRowRank(e);
+    const rOld = salesRowRank(prev);
+    if (rNew > rOld) map.set(key, e);
+    else if (rNew === rOld && String(e.created_at || '') > String(prev.created_at || '')) map.set(key, e);
+  });
+  return [...map.values()];
+}
+
+function sumSalesAmount(rows) {
+  return rows.reduce((s, r) => s + Number(r.sales_amount || 0), 0);
 }
 
 /** Personal goal for the month (matches manager logic: per_ba vs team_total + headcount). */
@@ -563,7 +613,8 @@ async function refreshTargetBanner() {
     return;
   }
 
-  const mySales = (salesRes.data || []).reduce((s, r) => s + Number(r.sales_amount || 0), 0);
+  const monthSales = dedupeMySalesRows(salesRes.data || []);
+  const mySales = sumSalesAmount(monthSales);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
     pctEl.textContent = '—';
@@ -582,7 +633,7 @@ async function refreshTargetBanner() {
     `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
 
   const importNote =
-    ' Total uses <strong>all sales linked to your account</strong> for this month (including manager uploads from daily reports). Only days you log in the app appear below in history.';
+    ' Total = <strong>one row per day, shop &amp; shift</strong> for this month (manager daily reports + your app entries; duplicates removed). History below shows the same deduped list.';
 
   if (mode === 'team_total' && teamGoal != null) {
     footEl.innerHTML =
@@ -705,6 +756,7 @@ async function submitSale() {
     document.getElementById('items-sold').value   = '';
     document.getElementById('entry-shift').value  = '';
     setDefaultDates();
+    try { await sb.rpc('link_my_legacy_rows'); } catch (_) {}
     await loadHistory();
     await updateStats();
     await refreshTargetBanner();
@@ -735,6 +787,7 @@ async function deleteSale(saleId) {
     return;
   }
   showMsg('Sale entry deleted.', 'success');
+  try { await sb.rpc('link_my_legacy_rows'); } catch (_) {}
   await loadHistory();
   await updateStats();
   await refreshTargetBanner();
@@ -796,13 +849,19 @@ async function loadHistory() {
   const monthKey = selectedMonthKey();
   const { start, end } = monthDateBounds(monthKey);
 
-  const { data: entries } = await sb
+  const { data: entriesRaw } = await sb
     .from('sales_entries')
     .select('*')
     .gte('entry_date', start)
     .lte('entry_date', end)
     .order('entry_date', { ascending: false })
-    .limit(40);
+    .limit(120);
+  const entries = dedupeMySalesRows(entriesRaw || [])
+    .sort((a, b) => {
+      if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
+      return String(b.created_at || '') > String(a.created_at || '') ? 1 : -1;
+    })
+    .slice(0, 40);
   const { data: attendance } = await sb
     .from('ba_attendance_entries')
     .select('*')
@@ -865,7 +924,7 @@ async function loadHistory() {
         </div>
       `;
     }
-    const statusLabel = r.status === 'annual_leave' ? 'Annual Leave' : 'Off Day';
+    const statusLabel = attendanceStatusLabel(r.status);
     return `
       <div class="entry-row">
         <div class="entry-left">
@@ -892,12 +951,13 @@ async function updateStats() {
     .lte('entry_date', end);
 
   if (error || !entries) return;
-  const totalSales = entries.reduce((s, e) => s + Number(e.sales_amount), 0);
-  const totalItems = entries.reduce((s, e) => s + e.items_sold, 0);
+  const monthSales = dedupeMySalesRows(entries);
+  const totalSales = sumSalesAmount(monthSales);
+  const totalItems = monthSales.reduce((s, e) => s + Number(e.items_sold || 0), 0);
 
   document.getElementById('stat-month-sales').textContent = '$' + totalSales.toLocaleString('en-US', {maximumFractionDigits:0});
   document.getElementById('stat-month-items').textContent = totalItems;
-  document.getElementById('stat-shifts').textContent      = new Set(entries.map(e => e.entry_date)).size;
+  document.getElementById('stat-shifts').textContent      = new Set(monthSales.map(e => e.entry_date)).size;
 }
 
 // ── Sign out ──────────────────────────────────────────────────────

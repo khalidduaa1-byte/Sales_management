@@ -393,6 +393,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
 .cal-cell-miss { background: #fef2f2; color: #dc2626; }
 .cal-cell-off { background: #fef9c3; color: #a16207; font-size: 10px; }
 .cal-cell-al { background: #dbeafe; color: #1d4ed8; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-ph { background: #e0e7ff; color: #4338ca; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-sl { background: #fce7f3; color: #be185d; font-size: 9px; letter-spacing: -0.5px; }
 .cal-cell-other { background: #f3e8ff; color: #7c3aed; font-size: 10px; }
 .cal-cell-future { background: #f9fafb; color: #d1d5db; font-size: 12px; font-weight: 500; }
 .cal-day-th.future-day .cal-day-num { color: #9ca3af; }
@@ -666,9 +668,11 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <div class="cal-legend missing-section" style="margin-top:12px">
       <span class="cal-legend-item"><span class="cal-pill cal-cell-sold">✓</span> Sales logged</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-miss">✗</span> Missing — no sales</span>
-      <span class="cal-legend-item"><span class="cal-pill cal-cell-off">OFF</span> Off day (BA marked)</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-off">OFF</span> Off day</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-al">AL</span> Annual leave</span>
-      <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other leave</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-ph">PH</span> Public holiday</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-sl">SL</span> Sick leave</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other (legacy imports)</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-future">·</span> Upcoming (not counted)</span>
     </div>
     <p class="miss-summary" style="margin-top:8px;margin-bottom:0">
@@ -831,6 +835,17 @@ function dashboardBaNameList() {
 
 function normalizeBaKey(name) {
   return canonicalBaName(name).toLowerCase();
+}
+
+function attendanceStatusLabel(status) {
+  switch (status) {
+    case 'annual_leave': return 'Annual Leave';
+    case 'off_day': return 'Off Day';
+    case 'public_holiday': return 'Public Holiday';
+    case 'sick_leave': return 'Sick Leave';
+    case 'other': return 'Sick Leave'; /* legacy Excel imports used status "other" */
+    default: return 'Leave';
+  }
 }
 
 // Hidden from manager dashboard: test BA + manager accounts (not field BAs).
@@ -1795,7 +1810,7 @@ function dailyRowsForExport() {
     team: e.team,
     store: e.store || '',
     shift: '',
-    status: e.status === 'annual_leave' ? 'Annual Leave' : (e.status === 'other' ? 'Other Leave' : 'Off Day'),
+    status: attendanceStatusLabel(e.status),
     sales_amount: null,
     items_sold: null,
     working_days: null,
@@ -1840,6 +1855,8 @@ function renderDailySales() {
   const leaves = rows.filter(r => r.kind === 'attendance');
   const offDays = leaves.filter(r => r.status === 'Off Day').length;
   const annualLeaves = leaves.filter(r => r.status === 'Annual Leave').length;
+  const publicHolidays = leaves.filter(r => r.status === 'Public Holiday').length;
+  const sickLeaves = leaves.filter(r => r.status === 'Sick Leave').length;
   const otherLeaves = leaves.filter(r => r.status === 'Other Leave').length;
   const totalPcs = salesOnly.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
   const totalWd = salesOnly.reduce((s, e) => s + (Number(e.working_days) || 1), 0);
@@ -1851,7 +1868,7 @@ function renderDailySales() {
   const monthText = monthRaw ? monthLabel(monthRaw) : 'All Months';
   const dateText = start || end ? ` • ${start || '…'} → ${end || '…'}` : '';
   if (summary) {
-    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''}${dateText} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off days ${offDays} • Annual leave ${annualLeaves} • Other leave ${otherLeaves}`;
+    summary.textContent = `${monthText}${ba ? ' • ' + ba : ''}${dateText} — Total PCs ${totalPcs.toLocaleString()} • Avg qty / working day ${avg} • Off ${offDays} • AL ${annualLeaves} • PH ${publicHolidays} • SL ${sickLeaves} • Other ${otherLeaves}`;
   }
 }
 
@@ -1910,15 +1927,21 @@ function renderBAProfile() {
   const workedDaysSet = new Set(salesRows.map(e => e.entry_date));
   const offDaysSet = new Set(leaveRows.filter(e => e.status === 'off_day').map(e => String(e.entry_date)));
   const annualLeaveSet = new Set(leaveRows.filter(e => e.status === 'annual_leave').map(e => String(e.entry_date)));
+  const publicHolidaySet = new Set(leaveRows.filter(e => e.status === 'public_holiday').map(e => String(e.entry_date)));
+  const sickLeaveSet = new Set(leaveRows.filter(e => e.status === 'sick_leave').map(e => String(e.entry_date)));
   const otherLeaveSet = new Set(leaveRows.filter(e => e.status === 'other').map(e => String(e.entry_date)));
   const daysWorked = workedDaysSet.size;
   const offDays = offDaysSet.size;
   const annualLeave = annualLeaveSet.size;
+  const publicHolidays = publicHolidaySet.size;
+  const sickLeave = sickLeaveSet.size;
   const otherLeave = otherLeaveSet.size;
   const attendanceDaysSet = new Set([
     ...workedDaysSet,
     ...offDaysSet,
     ...annualLeaveSet,
+    ...publicHolidaySet,
+    ...sickLeaveSet,
     ...otherLeaveSet,
   ]);
   const avgQtyDay = totalWD ? (totalQty / totalWD) : 0;
@@ -1956,7 +1979,9 @@ function renderBAProfile() {
     <tr><td>Logs per worked day</td><td>${logsPerWorkedDay.toFixed(2)}</td><td>Higher than 1 means multiple entries on same worked date</td></tr>
     <tr><td>Top shop by qty</td><td>${topShop ? topShop[0] : '—'}</td><td>${topShop ? topShop[1] + ' pcs' : 'No sales rows'}</td></tr>
     <tr><td>Top shift by qty</td><td>${topShift ? topShift[0] : '—'}</td><td>${topShift ? topShift[1] + ' pcs' : 'No sales rows'}</td></tr>
-    <tr><td>Other leave days</td><td>${otherLeave}</td><td>Sick / public holiday / unknown marker days</td></tr>
+    <tr><td>Public holiday days</td><td>${publicHolidays}</td><td>Marked in app or reports</td></tr>
+    <tr><td>Sick leave days</td><td>${sickLeave}</td><td>Marked in app or reports</td></tr>
+    <tr><td>Other leave days</td><td>${otherLeave}</td><td>Legacy Excel imports only</td></tr>
     <tr><td>Attendance total</td><td>${attendanceDaysSet.size}</td><td>Unique attendance dates (Worked / Off / Annual / Other leave)</td></tr>
   `;
 }
@@ -2126,6 +2151,8 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
         const att = getProfileAttendanceStatus(profile, date, attById, attByName);
         if (att === 'off_day') { status = 'off_day'; label = 'Off day'; }
         else if (att === 'annual_leave') { status = 'annual_leave'; label = 'Annual leave'; }
+        else if (att === 'public_holiday') { status = 'public_holiday'; label = 'Public holiday'; }
+        else if (att === 'sick_leave') { status = 'sick_leave'; label = 'Sick leave'; }
         else if (att === 'other') { status = 'other'; label = 'Other leave'; }
       }
       return { date, status, label };
@@ -2173,6 +2200,12 @@ function missingCellMarkup(cell) {
   }
   if (cell.status === 'annual_leave') {
     return `<td class="cal-cell cal-cell-al" title="${title}">AL</td>`;
+  }
+  if (cell.status === 'public_holiday') {
+    return `<td class="cal-cell cal-cell-ph" title="${title}">PH</td>`;
+  }
+  if (cell.status === 'sick_leave') {
+    return `<td class="cal-cell cal-cell-sl" title="${title}">SL</td>`;
   }
   if (cell.status === 'other') {
     return `<td class="cal-cell cal-cell-other" title="${title}">L</td>`;
@@ -2299,6 +2332,8 @@ function missingStatusLabel(status) {
   if (status === 'sales') return 'Sales logged';
   if (status === 'off_day') return 'Off day';
   if (status === 'annual_leave') return 'Annual leave';
+  if (status === 'public_holiday') return 'Public holiday';
+  if (status === 'sick_leave') return 'Sick leave';
   if (status === 'other') return 'Other leave';
   if (status === 'future') return 'Upcoming';
   return 'Missing sales';

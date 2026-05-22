@@ -13,7 +13,11 @@ as $$
 $$;
 
 -- Attach legacy import rows to a profile by normalized name match.
-create or replace function public.link_legacy_rows_for_profile(p_user_id uuid, p_name text)
+create or replace function public.link_legacy_rows_for_profile(
+  p_user_id uuid,
+  p_display_name text,
+  p_import_match_name text default null
+)
 returns json
 language plpgsql
 security definer
@@ -22,25 +26,25 @@ as $$
 declare
   n_sales int;
   n_att int;
-  norm text;
+  norm_match text;
 begin
-  norm := public.normalize_ba_name(p_name);
-  if norm = '' or p_user_id is null then
+  norm_match := public.normalize_ba_name(coalesce(nullif(trim(p_import_match_name), ''), p_display_name));
+  if public.normalize_ba_name(p_display_name) = '' or p_user_id is null then
     return json_build_object('ok', false, 'sales_linked', 0, 'attendance_linked', 0);
   end if;
 
   update public.sales_entries
   set ba_id = p_user_id,
-      ba_name = trim(p_name)
+      ba_name = trim(p_display_name)
   where ba_id is null
-    and public.normalize_ba_name(ba_name) = norm;
+    and public.normalize_ba_name(ba_name) = norm_match;
   get diagnostics n_sales = row_count;
 
   update public.ba_attendance_entries
   set ba_id = p_user_id,
-      ba_name = trim(p_name)
+      ba_name = trim(p_display_name)
   where ba_id is null
-    and public.normalize_ba_name(ba_name) = norm;
+    and public.normalize_ba_name(ba_name) = norm_match;
   get diagnostics n_att = row_count;
 
   return json_build_object('ok', true, 'sales_linked', n_sales, 'attendance_linked', n_att);
@@ -61,7 +65,7 @@ begin
   if v_name is null then
     return json_build_object('ok', false, 'error', 'no_profile');
   end if;
-  return public.link_legacy_rows_for_profile(auth.uid(), v_name);
+  return public.link_legacy_rows_for_profile(auth.uid(), v_name, v_name);
 end;
 $$;
 
@@ -115,7 +119,7 @@ begin
   );
 
   if coalesce(new.raw_user_meta_data->>'role', 'ba') = 'ba' then
-    perform public.link_legacy_rows_for_profile(new.id, v_name);
+    perform public.link_legacy_rows_for_profile(new.id, v_name, v_name);
   end if;
 
   return new;
@@ -134,7 +138,7 @@ declare
 begin
   for r in select id, name from public.profiles where role = 'ba'
   loop
-    res := public.link_legacy_rows_for_profile(r.id, r.name);
+    res := public.link_legacy_rows_for_profile(r.id, r.name, r.name);
     raise notice 'Profile % (%): %', r.name, r.id, res;
   end loop;
 end $$;

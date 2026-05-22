@@ -21,7 +21,7 @@ group by 1
 order by 1;
 
 -- 3) May 2026 detail (current month on BA app)
-select entry_date, store, shift, sales_amount, items_sold, created_at
+select s.entry_date, s.store, s.shift, s.sales_amount, s.items_sold, s.created_at
 from public.sales_entries s
 join public.profiles p on p.id = s.ba_id
 where public.normalize_ba_name(p.name) = public.normalize_ba_name('Mamdouh Mohamed')
@@ -29,7 +29,7 @@ where public.normalize_ba_name(p.name) = public.normalize_ba_name('Mamdouh Moham
 order by s.entry_date, s.store;
 
 -- 4) April 2026 (Excel import — he did not type these in the app)
-select entry_date, store, shift, sales_amount, items_sold
+select s.entry_date, s.store, s.shift, s.sales_amount, s.items_sold
 from public.sales_entries s
 join public.profiles p on p.id = s.ba_id
 where public.normalize_ba_name(p.name) = public.normalize_ba_name('Mamdouh Mohamed')
@@ -37,13 +37,13 @@ where public.normalize_ba_name(p.name) = public.normalize_ba_name('Mamdouh Moham
 order by s.entry_date;
 
 -- 5) Duplicate same day / shop / shift (double-count risk)
-select entry_date, store, shift, count(*) as cnt, sum(sales_amount) as total
+select s.entry_date, s.store, s.shift, count(*) as cnt, sum(s.sales_amount) as total
 from public.sales_entries s
 join public.profiles p on p.id = s.ba_id
 where public.normalize_ba_name(p.name) = public.normalize_ba_name('Mamdouh Mohamed')
-group by entry_date, store, shift
+group by s.entry_date, s.store, s.shift
 having count(*) > 1
-order by entry_date;
+order by s.entry_date;
 
 -- 6) Target for his team (May) — small goal + high imports => high %
 select *

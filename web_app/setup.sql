@@ -56,7 +56,7 @@ create table if not exists public.ba_attendance_entries (
   team        text not null,
   store       text,
   entry_date  date not null,
-  status      text not null check (status in ('off_day', 'annual_leave', 'other')),
+  status      text not null check (status in ('off_day', 'annual_leave', 'public_holiday', 'sick_leave', 'other')),
   notes       text,
   created_at  timestamptz default now(),
   unique (ba_id, entry_date)
@@ -98,7 +98,7 @@ alter table public.monthly_targets enable row level security;
 alter table public.ba_attendance_entries enable row level security;
 alter table public.ba_attendance_entries drop constraint if exists ba_attendance_entries_status_check;
 alter table public.ba_attendance_entries add constraint ba_attendance_entries_status_check
-  check (status in ('off_day', 'annual_leave', 'other'));
+  check (status in ('off_day', 'annual_leave', 'public_holiday', 'sick_leave', 'other'));
 
 -- ── Row Level Security (RLS) ─────────────────────────────────────
 -- RLS means: users can only see/edit data they're allowed to.
@@ -125,19 +125,40 @@ drop policy if exists "BAs can read own attendance" on public.ba_attendance_entr
 drop policy if exists "BAs can update own attendance" on public.ba_attendance_entries;
 drop policy if exists "Managers can read all attendance" on public.ba_attendance_entries;
 
--- Helper function: check if the current user is a manager.
--- Must be security definer so it runs as the owner (bypasses RLS),
--- which prevents infinite recursion when called from a policy on profiles.
+-- Helper functions for RLS on profiles.
+-- Must be SECURITY DEFINER (bypasses RLS) so policies on profiles never
+-- subquery profiles under the caller's RLS (infinite recursion).
 create or replace function public.is_manager()
 returns boolean
 language sql
 security definer
 stable
+set search_path = public
 as $$
   select exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'manager'
   );
+$$;
+
+create or replace function public.auth_profile_role()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select role from public.profiles where id = auth.uid();
+$$;
+
+create or replace function public.auth_profile_team()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select team from public.profiles where id = auth.uid();
 $$;
 
 -- profiles: users can read their own profile, managers can read all
@@ -158,14 +179,10 @@ create policy "Users can update own profile"
 create policy "BAs can read same-team BA profiles"
   on public.profiles for select
   using (
-    exists (
-      select 1 from public.profiles me
-      where me.id = auth.uid()
-        and me.role = 'ba'
-        and me.team is not null
-        and public.profiles.role = 'ba'
-        and public.profiles.team = me.team
-    )
+    public.auth_profile_role() = 'ba'
+    and public.auth_profile_team() is not null
+    and role = 'ba'
+    and team = public.auth_profile_team()
   );
 
 -- sales_entries: BAs can insert + read their own; managers read all
@@ -261,7 +278,11 @@ as $$
   select lower(regexp_replace(trim(coalesce(raw, '')), '\s+', ' ', 'g'));
 $$;
 
-create or replace function public.link_legacy_rows_for_profile(p_user_id uuid, p_name text)
+create or replace function public.link_legacy_rows_for_profile(
+  p_user_id uuid,
+  p_display_name text,
+  p_import_match_name text default null
+)
 returns json
 language plpgsql
 security definer
@@ -270,23 +291,25 @@ as $$
 declare
   n_sales int;
   n_att int;
-  norm text;
+  norm_match text;
 begin
-  norm := public.normalize_ba_name(p_name);
-  if norm = '' or p_user_id is null then
+  norm_match := public.normalize_ba_name(coalesce(nullif(trim(p_import_match_name), ''), p_display_name));
+  if public.normalize_ba_name(p_display_name) = '' or p_user_id is null then
     return json_build_object('ok', false, 'sales_linked', 0, 'attendance_linked', 0);
   end if;
 
   update public.sales_entries
-  set ba_id = p_user_id
+  set ba_id = p_user_id,
+      ba_name = trim(p_display_name)
   where ba_id is null
-    and public.normalize_ba_name(ba_name) = norm;
+    and public.normalize_ba_name(ba_name) = norm_match;
   get diagnostics n_sales = row_count;
 
   update public.ba_attendance_entries
-  set ba_id = p_user_id
+  set ba_id = p_user_id,
+      ba_name = trim(p_display_name)
   where ba_id is null
-    and public.normalize_ba_name(ba_name) = norm;
+    and public.normalize_ba_name(ba_name) = norm_match;
   get diagnostics n_att = row_count;
 
   return json_build_object('ok', true, 'sales_linked', n_sales, 'attendance_linked', n_att);
@@ -306,8 +329,42 @@ begin
   if v_name is null then
     return json_build_object('ok', false, 'error', 'no_profile');
   end if;
-  return public.link_legacy_rows_for_profile(auth.uid(), v_name);
+  return public.link_legacy_rows_for_profile(
+    auth.uid(),
+    v_name,
+    public.import_roster_name_for_profile(v_name)
+  );
 end;
+$$;
+
+create or replace function public.import_roster_name_for_profile(p_display_name text)
+returns text
+language sql
+immutable
+as $$
+  select coalesce(
+    (
+      select m.roster_name
+      from (
+        values
+          ('Mohamed Ahmed',   'Mohamed'),
+          ('Mamdouh Mohamed', 'Mamdouh'),
+          ('Nada Saad',       'Nada'),
+          ('Emaan Salah',     'Eman1'),
+          ('Eman salah',      'Eman1'),
+          ('veronia',         'Veronia'),
+          ('Samah mohamed',   'Samah'),
+          ('Samah Mohamed',   'Samah'),
+          ('ahmed abdelaal',  'Ahmed'),
+          ('Esraa Abdullah',  'Esraa'),
+          ('Mohamed Atef',    'Atef'),
+          ('Nouran adel',     'Nouran')
+      ) as m(registered_name, roster_name)
+      where public.normalize_ba_name(m.registered_name) = public.normalize_ba_name(p_display_name)
+      limit 1
+    ),
+    p_display_name
+  );
 $$;
 
 create or replace function public.get_registration_ba_names()
@@ -337,6 +394,10 @@ $$;
 
 grant execute on function public.normalize_ba_name(text) to anon, authenticated;
 grant execute on function public.get_registration_ba_names() to anon, authenticated;
+grant execute on function public.is_manager() to authenticated;
+grant execute on function public.auth_profile_role() to authenticated;
+grant execute on function public.auth_profile_team() to authenticated;
+grant execute on function public.import_roster_name_for_profile(text) to authenticated;
 grant execute on function public.link_my_legacy_rows() to authenticated;
 
 -- ── Auto-create profile on signup + link imported history ────────
@@ -363,7 +424,11 @@ begin
   );
 
   if coalesce(new.raw_user_meta_data->>'role', 'ba') = 'ba' then
-    perform public.link_legacy_rows_for_profile(new.id, v_name);
+    perform public.link_legacy_rows_for_profile(
+      new.id,
+      v_name,
+      public.import_roster_name_for_profile(v_name)
+    );
   end if;
 
   return new;
