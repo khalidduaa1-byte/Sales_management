@@ -315,7 +315,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 <!-- Target vs your sales (month) — only your rows are returned from Supabase for BAs -->
 <div class="target-banner" id="target-banner-wrap">
   <div class="target-card" id="target-card">
-    <h3>Monthly target</h3>
+    <h3 id="target-month-title">Monthly target</h3>
     <div class="target-row">
       <div class="big" id="target-attain-pct">—</div>
       <div class="sub" id="target-attain-sub">Loading…</div>
@@ -496,6 +496,11 @@ function monthDateBounds(monthKey) {
   return { start, end };
 }
 
+function formatMonthLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
 /** Personal goal for the month (matches manager logic: per_ba vs team_total + headcount). */
 async function computePersonalMonthlyTarget(monthKey, teamCanon) {
   const { data: tRow, error: tErr } = await sb
@@ -539,6 +544,8 @@ async function refreshTargetBanner() {
 
   const monthKey = selectedMonthKey();
   const { start, end } = monthDateBounds(monthKey);
+  const monthTitle = document.getElementById('target-month-title');
+  if (monthTitle) monthTitle.textContent = `Monthly target — ${formatMonthLabel(monthKey)}`;
 
   const [{ goal, mode, teamGoal, teamBas }, salesRes] = await Promise.all([
     computePersonalMonthlyTarget(monthKey, team),
@@ -561,7 +568,7 @@ async function refreshTargetBanner() {
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
     pctEl.textContent = '—';
     subEl.textContent = 'No target set';
-    footEl.innerHTML = `Your sales <strong>${monthKey}</strong>: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
+    footEl.innerHTML = `Your sales <strong>${formatMonthLabel(monthKey)}</strong>: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
     barEl.style.width = '0%';
     return;
   }
@@ -574,17 +581,22 @@ async function refreshTargetBanner() {
     `You: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
     `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
 
+  const importNote =
+    ' Total uses <strong>all sales linked to your account</strong> for this month (including manager uploads from daily reports). Only days you log in the app appear below in history.';
+
   if (mode === 'team_total' && teamGoal != null) {
     footEl.innerHTML =
       `Team target <strong>$${teamGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> split across <strong>${teamBas}</strong> BAs (even share for your progress bar). ` +
       (remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to reach your share.`
-        : `<strong>Share reached</strong> — great work.`);
+        : `<strong>Share reached</strong> — great work.`) +
+      importNote;
   } else {
     footEl.innerHTML =
-      remain > 0
+      (remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to hit your personal target.`
-        : `Personal target reached — great work.`;
+        : `Personal target reached — great work.`) +
+      importNote;
   }
 
   barEl.style.width = `${Math.min(100, pct)}%`;
@@ -780,17 +792,24 @@ async function submitLeave() {
 
 // ── Load history ──────────────────────────────────────────────────
 async function loadHistory() {
-  // RLS returns only this BA's rows (ba_id match or legacy import matched to profile name).
+  // RLS returns only this BA's rows — scope to current month so old Excel months don't look like "today".
+  const monthKey = selectedMonthKey();
+  const { start, end } = monthDateBounds(monthKey);
+
   const { data: entries } = await sb
     .from('sales_entries')
     .select('*')
+    .gte('entry_date', start)
+    .lte('entry_date', end)
     .order('entry_date', { ascending: false })
-    .limit(30);
+    .limit(40);
   const { data: attendance } = await sb
     .from('ba_attendance_entries')
     .select('*')
+    .gte('entry_date', start)
+    .lte('entry_date', end)
     .order('entry_date', { ascending: false })
-    .limit(30);
+    .limit(40);
 
   const list = document.getElementById('history-list');
   const salesRows = (entries || []).map(e => ({
