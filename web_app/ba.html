@@ -356,12 +356,6 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <label>Shop</label>
     <select id="entry-store">
       <option value="">Select shop</option>
-      <option value="Terminal 3 Cairo">Terminal 3 Cairo</option>
-      <option value="Terminal 2 Cairo">Terminal 2 Cairo</option>
-      <option value="Terminal 1 Cairo">Terminal 1 Cairo</option>
-      <option value="Sharm Sheikh">Sharm Sheikh</option>
-      <option value="Hurghada russian shop">Hurghada russian shop</option>
-      <option value="Hurghada European shop">Hurghada European shop</option>
     </select>
 
     <label>Shift</label>
@@ -472,6 +466,7 @@ let currentProfile = null;
   document.getElementById('ba-name').textContent = profile.name;
   document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
 
+  populateShopOptions();
   setDefaultDates();
   await loadHistory();
   await updateStats();
@@ -485,6 +480,28 @@ function canonicalTeamName(raw) {
   if (key === 'sharm') return 'Sharm';
   if (['hurgadah', 'hurghada', 'hurgahda', 'hurgada'].includes(key)) return 'Hurgadah';
   return raw || '';
+}
+
+const SHOPS_BY_TEAM = {
+  Cairo: [
+    'Terminal 3 Cairo',
+    'Terminal 2 Cairo',
+    'Terminal 1 Cairo',
+    'Seasonal Terminal',
+  ],
+  Sharm: ['Sharm Sheikh'],
+  Hurgadah: ['Hurghada russian shop', 'Hurghada European shop'],
+};
+
+function populateShopOptions() {
+  const sel = document.getElementById('entry-store');
+  if (!sel) return;
+  const team = currentProfile ? canonicalTeamName(currentProfile.team) : '';
+  const shops = SHOPS_BY_TEAM[team] || Object.values(SHOPS_BY_TEAM).flat();
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Select shop</option>' +
+    shops.map(s => `<option value="${s}">${s}</option>`).join('');
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
 function selectedMonthKey() {
@@ -697,8 +714,8 @@ async function submitSale() {
   if (!date)          return showMsg('Please select a date.', 'error');
   if (!store)         return showMsg('Please select a shop.', 'error');
   if (!shift)         return showMsg('Please select a shift.', 'error');
-  if (isNaN(amount) || amount <= 0) return showMsg('Enter a valid sales amount.', 'error');
-  if (isNaN(items)  || items  <  0) return showMsg('Enter a valid items count.', 'error');
+  if (isNaN(amount) || amount < 0) return showMsg('Enter sales amount (0 or more).', 'error');
+  if (isNaN(items)  || items  <  0) return showMsg('Enter items count (0 or more).', 'error');
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
@@ -751,7 +768,12 @@ async function submitSale() {
   if (error) {
     showMsg('Error saving: ' + error.message, 'error');
   } else {
-    showMsg('Entry logged successfully!', 'success');
+    showMsg(
+      amount === 0
+        ? '😢 Zero sales logged — better luck next shift!'
+        : 'Entry logged successfully!',
+      'success'
+    );
     document.getElementById('sales-amount').value = '';
     document.getElementById('items-sold').value   = '';
     document.getElementById('entry-shift').value  = '';
@@ -910,6 +932,10 @@ async function loadHistory() {
       const delBtn = canDelete
         ? `<button type="button" class="entry-delete" data-sale-id="${r.id}">Delete</button>`
         : '';
+      const saleAmt = Number(r.sales_amount);
+      const saleAmtLabel = saleAmt === 0
+        ? '$0 😢'
+        : '$' + saleAmt.toLocaleString('en-US', { maximumFractionDigits: 0 });
       return `
         <div class="entry-row">
           <div class="entry-left">
@@ -917,7 +943,7 @@ async function loadHistory() {
             <div class="entry-meta">${r.store || '—'} • ${r.shift || '—'}</div>
           </div>
           <div class="entry-right">
-            <div class="entry-amount">$${Number(r.sales_amount).toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+            <div class="entry-amount">${saleAmtLabel}</div>
             <div class="entry-items">${r.items_sold} pcs</div>
             ${delBtn}
           </div>

@@ -773,7 +773,7 @@ function storeToManagerCity(store, team) {
   if (MANAGER_CITY_FILTERS.includes(t)) return t;
   const s = String(store || '').trim().toLowerCase();
   if (!s) return t || '';
-  if (s.includes('cairo') || /^terminal\s*\d/.test(s)) return 'Cairo';
+  if (s.includes('cairo') || s.includes('seasonal') || /^terminal/.test(s)) return 'Cairo';
   if (s.includes('sharm')) return 'Sharm';
   if (s.includes('hurgh') || s.includes('hurgad')) return 'Hurgadah';
   const fromStore = canonicalTeamName(store);
