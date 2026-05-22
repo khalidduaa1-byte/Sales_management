@@ -427,6 +427,8 @@ const sb = createClient(
 
 let currentUser = null;
 let currentProfile = null;
+/** One fetch per refresh — keeps target bar, stats, and history in sync. */
+let monthSalesCache = { key: null, rows: null };
 
 // ── On page load ──────────────────────────────────────────────────
 // getSession checks if the user is logged in (Supabase stores a token in the browser)
@@ -467,9 +469,7 @@ let currentProfile = null;
 
   populateShopOptions();
   setDefaultDates();
-  await loadHistory();
-  await updateStats();
-  await refreshTargetBanner();
+  await refreshBaDashboard();
 })();
 
 // ── Team / month helpers (align with manager dashboard naming) ───
@@ -532,11 +532,16 @@ function attendanceStatusLabel(status) {
   }
 }
 
+function normalizeEntryDate(d) {
+  if (!d) return '';
+  return String(d).slice(0, 10);
+}
+
 /** Same day + shop + shift must count once (linked import + legacy name row = duplicate). */
 function salesShiftKey(e) {
   const store = String(e.store || '').trim().toLowerCase();
   const shift = String(e.shift || '').trim().toLowerCase();
-  return `${e.entry_date}|${store}|${shift}`;
+  return `${normalizeEntryDate(e.entry_date)}|${store}|${shift}`;
 }
 
 function salesRowRank(e) {
@@ -567,16 +572,55 @@ function sumSalesAmount(rows) {
   return rows.reduce((s, r) => s + Number(r.sales_amount || 0), 0);
 }
 
-/** Month sales for this BA — needs date/shop/shift for dedupe (not amount-only). */
+/** Month sales for this BA — must include date, shop, shift (never amount-only). */
 async function fetchMyDedupedMonthSales(monthKey) {
   const { start, end } = monthDateBounds(monthKey);
   const { data, error } = await sb
     .from('sales_entries')
-    .select('id, entry_date, store, shift, sales_amount, items_sold, ba_id, created_at')
+    .select('id, entry_date, store, shift, sales_amount, items_sold, ba_id, created_at, team')
     .gte('entry_date', start)
-    .lte('entry_date', end);
+    .lte('entry_date', end)
+    .order('entry_date', { ascending: true })
+    .limit(2000);
   if (error) return { rows: [], error };
   return { rows: dedupeMySalesRows(data || []), error: null };
+}
+
+function invalidateMonthSalesCache() {
+  monthSalesCache = { key: null, rows: null };
+}
+
+async function getMyMonthSales(forceRefresh) {
+  const monthKey = selectedMonthKey();
+  if (!forceRefresh && monthSalesCache.key === monthKey && monthSalesCache.rows) {
+    return { monthKey, rows: monthSalesCache.rows, error: null };
+  }
+  const res = await fetchMyDedupedMonthSales(monthKey);
+  if (!res.error) monthSalesCache = { key: monthKey, rows: res.rows };
+  return { monthKey, rows: res.rows, error: res.error };
+}
+
+function renderStatsFromRows(monthSales) {
+  const rows = monthSales || [];
+  const totalSales = sumSalesAmount(rows);
+  const totalItems = rows.reduce((s, e) => s + Number(e.items_sold || 0), 0);
+  document.getElementById('stat-month-sales').textContent =
+    '$' + totalSales.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  document.getElementById('stat-month-items').textContent = String(totalItems);
+  document.getElementById('stat-shifts').textContent =
+    String(new Set(rows.map(e => normalizeEntryDate(e.entry_date))).size);
+}
+
+/** Reload sales + target + history from one DB read (all BAs use this). */
+async function refreshBaDashboard() {
+  const { rows, error } = await getMyMonthSales(true);
+  if (error) {
+    showMsg('Could not load your sales. Check your connection and refresh the page.', 'error');
+    return;
+  }
+  renderStatsFromRows(rows);
+  await renderTargetBanner(rows);
+  await loadHistory(rows);
 }
 
 /** Personal goal for the month (matches manager logic: per_ba vs team_total + headcount). */
@@ -604,7 +648,7 @@ async function computePersonalMonthlyTarget(monthKey, teamCanon) {
   return { goal: share, mode: 'team_total', teamGoal: value, teamBas: n, raw: tRow };
 }
 
-async function refreshTargetBanner() {
+async function renderTargetBanner(monthSales) {
   const pctEl = document.getElementById('target-attain-pct');
   const subEl = document.getElementById('target-attain-sub');
   const footEl = document.getElementById('target-foot');
@@ -624,21 +668,8 @@ async function refreshTargetBanner() {
   const monthTitle = document.getElementById('target-month-title');
   if (monthTitle) monthTitle.textContent = `Monthly target — ${formatMonthLabel(monthKey)}`;
 
-  const [{ goal, mode, teamGoal, teamBas }, salesRes] = await Promise.all([
-    computePersonalMonthlyTarget(monthKey, team),
-    fetchMyDedupedMonthSales(monthKey),
-  ]);
-
-  if (salesRes.error) {
-    subEl.textContent = 'Could not load your sales.';
-    footEl.textContent = salesRes.error.message || '';
-    pctEl.textContent = '—';
-    barEl.style.width = '0%';
-    return;
-  }
-
-  const monthSales = salesRes.rows;
-  const mySales = sumSalesAmount(monthSales);
+  const { goal, mode, teamGoal, teamBas } = await computePersonalMonthlyTarget(monthKey, team);
+  const mySales = sumSalesAmount(monthSales || []);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
     pctEl.textContent = '—';
@@ -781,9 +812,8 @@ async function submitSale() {
     document.getElementById('entry-shift').value  = '';
     setDefaultDates();
     try { await sb.rpc('link_my_legacy_rows'); } catch (_) {}
-    await loadHistory();
-    await updateStats();
-    await refreshTargetBanner();
+    invalidateMonthSalesCache();
+    await refreshBaDashboard();
   }
 }
 
@@ -812,9 +842,8 @@ async function deleteSale(saleId) {
   }
   showMsg('Sale entry deleted.', 'success');
   try { await sb.rpc('link_my_legacy_rows'); } catch (_) {}
-  await loadHistory();
-  await updateStats();
-  await refreshTargetBanner();
+  invalidateMonthSalesCache();
+  await refreshBaDashboard();
 }
 
 // ── Submit off/leave (single day or From–Till range) ─────────────
@@ -863,16 +892,16 @@ async function submitLeave() {
     );
     document.getElementById('leave-notes').value = '';
     setDefaultDates();
-    await loadHistory();
+    invalidateMonthSalesCache();
+    await refreshBaDashboard();
   }
 }
 
 // ── Load history ──────────────────────────────────────────────────
-async function loadHistory() {
+async function loadHistory(monthSales) {
   const monthKey = selectedMonthKey();
   const { start, end } = monthDateBounds(monthKey);
 
-  const { rows: monthSales } = await fetchMyDedupedMonthSales(monthKey);
   const entries = (monthSales || [])
     .sort((a, b) => {
       if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
@@ -960,20 +989,6 @@ async function loadHistory() {
   }).join('');
 }
 
-// ── Update stats ──────────────────────────────────────────────────
-async function updateStats() {
-  const monthKey = selectedMonthKey();
-  const { rows: monthSales, error } = await fetchMyDedupedMonthSales(monthKey);
-
-  if (error) return;
-  const totalSales = sumSalesAmount(monthSales);
-  const totalItems = monthSales.reduce((s, e) => s + Number(e.items_sold || 0), 0);
-
-  document.getElementById('stat-month-sales').textContent = '$' + totalSales.toLocaleString('en-US', {maximumFractionDigits:0});
-  document.getElementById('stat-month-items').textContent = totalItems;
-  document.getElementById('stat-shifts').textContent      = new Set(monthSales.map(e => e.entry_date)).size;
-}
-
 // ── Sign out ──────────────────────────────────────────────────────
 async function signOut() {
   await sb.auth.signOut();
@@ -981,8 +996,14 @@ async function signOut() {
 }
 
 function formatDate(dateStr) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  const d = normalizeEntryDate(dateStr);
+  if (!d) return '—';
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+window.addEventListener('pageshow', () => {
+  if (currentProfile && currentProfile.role === 'ba') refreshBaDashboard();
+});
 function showMsg(text, type) {
   const el = document.getElementById('msg');
   el.textContent = text;
