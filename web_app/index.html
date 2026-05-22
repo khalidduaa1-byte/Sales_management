@@ -161,6 +161,21 @@ input::placeholder { color: #94a3b8; }
 }
 .install-hint strong { color: var(--text); }
 
+#pwa-install-banner { display: none; text-align: center; }
+.btn-install {
+  width: 100%;
+  background: #0f766e;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.btn-install:hover { background: #0d9488; }
+
 /* Register-only fields */
 #register-fields { display: none; }
 </style>
@@ -218,11 +233,21 @@ input::placeholder { color: #94a3b8; }
 
   <div class="msg" id="msg"></div>
 
-  <p class="install-hint" id="install-hint">
-    <strong>Add to your phone:</strong>
-    iPhone — Share → <strong>Add to Home Screen</strong>.
-    Android — menu → <strong>Install app</strong> or <strong>Add to Home screen</strong>.
-    Opens like Mercur — no App Store.
+  <div class="install-hint" id="pwa-install-banner">
+    <button type="button" class="btn-install" onclick="installPwa()">Install BA Sales on this phone</button>
+    <span style="font-size:11px;color:var(--muted)">One tap — then it opens from your home screen like Mercur.</span>
+  </div>
+
+  <p class="install-hint" id="install-hint-inapp" style="display:none">
+    <strong>Open in Safari or Chrome first.</strong> WhatsApp’s browser cannot install apps. Tap ⋯ → <strong>Open in browser</strong>, then add to home screen.
+  </p>
+
+  <p class="install-hint" id="install-hint-ios" style="display:none">
+    <strong>iPhone:</strong> Safari → Share → <strong>Add to Home Screen</strong>. Apple does not allow automatic install — one manual step.
+  </p>
+
+  <p class="install-hint" id="install-hint-android" style="display:none">
+    <strong>Android:</strong> Chrome menu (⋮) → <strong>Install app</strong> or <strong>Add to Home screen</strong>. Visit this page twice if you don’t see Install.
   </p>
 </div>
 
