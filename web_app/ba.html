@@ -649,22 +649,17 @@ async function refreshTargetBanner() {
     `You: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
     `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
 
-  const importNote =
-    ' Total = <strong>one row per day, shop &amp; shift</strong> for this month (manager daily reports + your app entries; duplicates removed). History below shows the same deduped list.';
-
   if (mode === 'team_total' && teamGoal != null) {
     footEl.innerHTML =
       `Team target <strong>$${teamGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> split across <strong>${teamBas}</strong> BAs (even share for your progress bar). ` +
       (remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to reach your share.`
-        : `<strong>Share reached</strong> — great work.`) +
-      importNote;
+        : `<strong>Share reached</strong> — great work.`);
   } else {
     footEl.innerHTML =
-      (remain > 0
+      remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to hit your personal target.`
-        : `Personal target reached — great work.`) +
-      importNote;
+        : `Personal target reached — great work.`;
   }
 
   barEl.style.width = `${Math.min(100, pct)}%`;
