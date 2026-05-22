@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BA Sales">
+  <rect width="512" height="512" rx="112" fill="#2563eb"/>
+  <path fill="#ffffff" d="M128 352V160h88c48 0 80 28 80 72 0 28-14 50-40 62l52 68h-64l-44-60h-24v60H128zm56-148h28c22 0 34-10 34-28s-12-28-34-28h-28v56z"/>
+  <circle cx="368" cy="200" r="40" fill="#93c5fd"/>
+  <path fill="#ffffff" d="M328 280h80l-40 72z" opacity="0.9"/>
+</svg>
