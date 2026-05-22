@@ -458,10 +458,9 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
-  <!-- KPIs -->
-  <div class="sec-lbl perf-section">Today's Performance</div>
+  <!-- KPIs (selected month — follows Month filter above) -->
+  <div class="sec-lbl perf-section">Month overview</div>
   <div class="kpi-grid perf-section" id="kpi-grid">
-    <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-val" id="kv0">—</div><div class="kpi-lbl">Today's Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon green"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-val" id="kv1">—</div><div class="kpi-lbl">Monthly Sales</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon purple"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div><div class="kpi-val" id="kv2">—</div><div class="kpi-lbl">Total PCs Sold</div></div>
     <div class="kpi-card"><div class="kpi-icon-row"><div class="kpi-icon orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div><div class="kpi-val" id="kv3">—</div><div class="kpi-lbl">Avg PCs / BA / Day</div></div>
@@ -1315,8 +1314,6 @@ function resetFilters() {
 
 // ── KPIs ─────────────────────────────────────────────────────────
 function renderKPIs(entries) {
-  const today     = new Date().toISOString().slice(0,10);
-  const todaySales = entries.filter(e => e.entry_date === today).reduce((s,e) => s + +e.sales_amount, 0);
   const mthSales   = entries.reduce((s,e) => s + +e.sales_amount, 0);
   const totalPcs   = entries.reduce((s,e) => s + e.items_sold, 0);
   const bas        = new Set(entries.map(e => e.ba_name));
@@ -1331,7 +1328,6 @@ function renderKPIs(entries) {
     .map(n => [n, qtyByBA[n] / workByBA[n]])
     .sort((a, b) => b[1] - a[1])[0];
 
-  setText('kv0', '$' + fmt(todaySales));
   setText('kv1', '$' + fmt(mthSales));
   setText('kv2', totalPcs.toLocaleString());
   setText('kv3', avgPcsPerDay);
