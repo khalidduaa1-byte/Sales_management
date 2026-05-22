@@ -312,7 +312,6 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   <button class="signout-btn" onclick="signOut()">Sign out</button>
 </div>
 
-<!-- Target vs your sales (month) — only your rows are returned from Supabase for BAs -->
 <div class="target-banner" id="target-banner-wrap">
   <div class="target-card" id="target-card">
     <h3 id="target-month-title">Monthly target</h3>
@@ -800,7 +799,7 @@ async function deleteSale(saleId) {
     return;
   }
   if (!data || data.length === 0) {
-    showMsg('Could not delete this entry (nothing removed). If it is an old import, ask a manager to remove it in Supabase.', 'error');
+    showMsg('Could not delete this entry. Try again or ask your manager for help.', 'error');
     return;
   }
   showMsg('Sale entry deleted.', 'success');

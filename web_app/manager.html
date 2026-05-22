@@ -441,7 +441,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <span class="sec-lbl" style="margin:0">Month</span>
       <select class="f-sel" id="global-month" onchange="applyFilters()" style="min-width:150px"></select>
       <span class="sec-lbl" style="margin:0">City</span>
-      <select class="f-sel" id="global-store" onchange="onGlobalStoreChange()" style="min-width:160px" title="Filter by city. BA entries keep terminal / shop detail; terminal-level filter coming later.">
+      <select class="f-sel" id="global-store" onchange="onGlobalStoreChange()" style="min-width:160px" title="Filter by city">
         <option value="">All cities</option>
         <option value="Cairo">Cairo</option>
         <option value="Sharm">Sharm</option>
@@ -672,7 +672,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <span class="cal-legend-item"><span class="cal-pill cal-cell-al">AL</span> Annual leave</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-ph">PH</span> Public holiday</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-sl">SL</span> Sick leave</span>
-      <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other (legacy imports)</span>
+      <span class="cal-legend-item"><span class="cal-pill cal-cell-other">L</span> Other leave</span>
       <span class="cal-legend-item"><span class="cal-pill cal-cell-future">·</span> Upcoming (not counted)</span>
     </div>
     <p class="miss-summary" style="margin-top:8px;margin-bottom:0">
@@ -1122,7 +1122,7 @@ async function loadAll() {
   if (error) {
     console.error(error);
     allEntries = [];
-    showPageError('Could not load sales_entries. Please run setup.sql and refresh.');
+    showPageError('Could not load sales data. Refresh the page and try again.');
     applyFilters();
     return;
   }
@@ -1434,7 +1434,7 @@ async function saveTarget() {
   }, { onConflict: 'month_key,team' });
   if (error) {
     msgEl.style.color = '#dc2626';
-    msgEl.textContent = 'Save failed. Run setup.sql migration for monthly_targets.';
+    msgEl.textContent = 'Could not save target. Try again.';
     return;
   }
   msgEl.style.color = '#059669';
@@ -1975,14 +1975,14 @@ function renderBAProfile() {
   body.innerHTML = `
     <tr><td>Productivity level</td><td>${productivity}</td><td>Based on avg qty/day (${avgQtyDay.toFixed(1)})</td></tr>
     <tr><td>Avg sales / working day</td><td>$${fmt(avgSalesDay)}</td><td>Total sales divided by total working days</td></tr>
-    <tr><td>Recorded working days (sum)</td><td>${totalWD}</td><td>Sum of working_days across selected rows</td></tr>
-    <tr><td>Logs per worked day</td><td>${logsPerWorkedDay.toFixed(2)}</td><td>Higher than 1 means multiple entries on same worked date</td></tr>
-    <tr><td>Top shop by qty</td><td>${topShop ? topShop[0] : '—'}</td><td>${topShop ? topShop[1] + ' pcs' : 'No sales rows'}</td></tr>
-    <tr><td>Top shift by qty</td><td>${topShift ? topShift[0] : '—'}</td><td>${topShift ? topShift[1] + ' pcs' : 'No sales rows'}</td></tr>
-    <tr><td>Public holiday days</td><td>${publicHolidays}</td><td>Marked in app or reports</td></tr>
-    <tr><td>Sick leave days</td><td>${sickLeave}</td><td>Marked in app or reports</td></tr>
-    <tr><td>Other leave days</td><td>${otherLeave}</td><td>Legacy Excel imports only</td></tr>
-    <tr><td>Attendance total</td><td>${attendanceDaysSet.size}</td><td>Unique attendance dates (Worked / Off / Annual / Other leave)</td></tr>
+    <tr><td>Recorded working days</td><td>${totalWD}</td><td>—</td></tr>
+    <tr><td>Logs per worked day</td><td>${logsPerWorkedDay.toFixed(2)}</td><td>—</td></tr>
+    <tr><td>Top shop by qty</td><td>${topShop ? topShop[0] : '—'}</td><td>${topShop ? topShop[1] + ' pcs' : '—'}</td></tr>
+    <tr><td>Top shift by qty</td><td>${topShift ? topShift[0] : '—'}</td><td>${topShift ? topShift[1] + ' pcs' : '—'}</td></tr>
+    <tr><td>Public holiday days</td><td>${publicHolidays}</td><td>—</td></tr>
+    <tr><td>Sick leave days</td><td>${sickLeave}</td><td>—</td></tr>
+    <tr><td>Other leave days</td><td>${otherLeave}</td><td>—</td></tr>
+    <tr><td>Attendance total</td><td>${attendanceDaysSet.size}</td><td>—</td></tr>
   `;
 }
 

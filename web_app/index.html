@@ -204,7 +204,7 @@ input::placeholder { color: #94a3b8; }
         <option value="">Loading names…</option>
       </select>
       <p id="name-hint" style="font-size:11px;color:var(--muted);margin:-8px 0 12px;line-height:1.4">
-        Choose the name that matches your imported sales history — not a new spelling.
+        Pick your name from the list exactly as shown (same spelling).
       </p>
 
       <div id="name-custom-wrap" style="display:none">
@@ -282,7 +282,7 @@ if (urlError) {
   const m = document.getElementById('msg');
   const detail = urlDetail ? decodeURIComponent(urlDetail) : '';
   m.textContent = urlError === 'profile'
-    ? ('Could not load your profile after sign-in. ' + (detail || 'Check profiles row + RLS in Supabase.'))
+    ? ('Could not load your profile after sign-in. ' + (detail || 'Please contact your manager.'))
     : 'Sign-in failed after redirect. Try again, or use an incognito window.';
   m.className = 'msg error';
   m.style.display = 'block';
@@ -444,7 +444,7 @@ async function handleSubmit(e) {
       if (error) throw error;
 
       const extra = fromRoster
-        ? ' Your past sales will link to this account after you confirm email.'
+        ? ' Your earlier sales will show after you confirm your email.'
         : '';
       showMsg('Account created! Check your email to confirm, then sign in.' + extra, 'success');
     }
