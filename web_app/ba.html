@@ -869,18 +869,11 @@ async function submitLeave() {
 
 // ── Load history ──────────────────────────────────────────────────
 async function loadHistory() {
-  // RLS returns only this BA's rows — scope to current month so old Excel months don't look like "today".
   const monthKey = selectedMonthKey();
   const { start, end } = monthDateBounds(monthKey);
 
-  const { data: entriesRaw } = await sb
-    .from('sales_entries')
-    .select('*')
-    .gte('entry_date', start)
-    .lte('entry_date', end)
-    .order('entry_date', { ascending: false })
-    .limit(120);
-  const entries = dedupeMySalesRows(entriesRaw || [])
+  const { rows: monthSales } = await fetchMyDedupedMonthSales(monthKey);
+  const entries = (monthSales || [])
     .sort((a, b) => {
       if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
       return String(b.created_at || '') > String(a.created_at || '') ? 1 : -1;
