@@ -803,6 +803,19 @@ function canonicalBaName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ');
 }
 
+/** Display name: registration / profile name in normal English caps (Samah Mohamed, Ahmed Abdelaal). */
+function formatBaDisplayName(name) {
+  const s = canonicalBaName(name);
+  if (!s) return s;
+  return s.split(/\s+/).map((word) =>
+    word.split(/(['-])/).map((part) => {
+      if (part === "'" || part === '-') return part;
+      if (!part) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    }).join(''),
+  ).join(' ');
+}
+
 function rebuildBaProfileNameMap() {
   baProfileNameById = new Map();
   allBaProfiles.forEach(p => {
@@ -815,7 +828,7 @@ function registeredBaName(entry) {
   if (entry?.ba_id && baProfileNameById.has(entry.ba_id)) {
     return baProfileNameById.get(entry.ba_id);
   }
-  return canonicalBaName(entry?.ba_name);
+  return formatBaDisplayName(entry?.ba_name);
 }
 
 /** Names for filters: registered BAs first; Excel-only names only if still unlinked. */
@@ -1054,7 +1067,7 @@ async function loadTeamHeadcount() {
     .filter(p => !isDashboardExcludedProfile(p))
     .map(p => ({
       id: p.id,
-      name: canonicalBaName(p.name),
+      name: formatBaDisplayName(p.name),
       team: canonicalTeamName(p.team),
       store: String(p.store || '').trim(),
     }));
@@ -2027,7 +2040,7 @@ function monthCheckRange(monthKey) {
 
 function entryMatchesProfile(entry, profile) {
   if (entry.ba_id && profile.id && entry.ba_id === profile.id) return true;
-  return canonicalBaName(entry.ba_name) === profile.name;
+  return formatBaDisplayName(entry.ba_name) === profile.name;
 }
 
 function baPassesShopFilter(profile, cityFilter, monthKey) {
@@ -2073,7 +2086,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
     if (cityFilter && storeToManagerCity(e.store, e.team) !== cityFilter) return;
     const d = normalizeEntryDate(e.entry_date);
     if (e.ba_id) addSale(salesById, e.ba_id, d);
-    addSale(salesByName, canonicalBaName(e.ba_name), d);
+    addSale(salesByName, formatBaDisplayName(e.ba_name), d);
   });
 
   attendanceEntries.forEach(e => {
@@ -2083,7 +2096,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
     const d = normalizeEntryDate(e.entry_date);
     const status = e.status || 'off_day';
     if (e.ba_id) addAtt(attById, e.ba_id, d, status);
-    addAtt(attByName, canonicalBaName(e.ba_name), d, status);
+    addAtt(attByName, formatBaDisplayName(e.ba_name), d, status);
   });
 
   const seen = new Set();
@@ -2091,7 +2104,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
   allEntries.forEach(e => {
     if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
     if (isDashboardExcludedEntry(e)) return;
-    const name = canonicalBaName(e.ba_name);
+    const name = formatBaDisplayName(e.ba_name);
     if (!name || seen.has(name) || isDashboardExcludedName(name)) return;
     if (bas.some(p => p.name === name || (e.ba_id && p.id === e.ba_id))) return;
     seen.add(name);
