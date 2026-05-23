@@ -123,6 +123,7 @@ drop policy if exists "BAs can read same-team BA profiles" on public.profiles;
 drop policy if exists "BAs can insert own attendance" on public.ba_attendance_entries;
 drop policy if exists "BAs can read own attendance" on public.ba_attendance_entries;
 drop policy if exists "BAs can update own attendance" on public.ba_attendance_entries;
+drop policy if exists "BAs can delete own attendance" on public.ba_attendance_entries;
 drop policy if exists "Managers can read all attendance" on public.ba_attendance_entries;
 
 -- Helper functions for RLS on profiles.
@@ -251,6 +252,16 @@ create policy "BAs can update own attendance"
   on public.ba_attendance_entries for update
   using (ba_id = auth.uid())
   with check (ba_id = auth.uid());
+
+create policy "BAs can delete own attendance"
+  on public.ba_attendance_entries for delete
+  using (
+    ba_id = auth.uid()
+    or (
+      ba_id is null
+      and lower(trim(ba_name)) = lower(trim((select p.name from public.profiles p where p.id = auth.uid())))
+    )
+  );
 
 create policy "Managers can read all attendance"
   on public.ba_attendance_entries for select

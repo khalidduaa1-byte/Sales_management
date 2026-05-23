@@ -20,8 +20,9 @@
   --card: #ffffff;
   --card2: #f8fafc;
   --border: #e2e8f0;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --accent: #111827;
+  --accent-hover: #000000;
+  --focus-ring: rgba(0, 0, 0, 0.12);
   --green: #16a34a;
   --orange: #d97706;
   --red: #dc2626;
@@ -79,16 +80,16 @@ body {
   padding: 14px 16px 0;
 }
 .target-card {
-  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%);
+  border: 1px solid #e5e7eb;
   border-radius: 14px;
   padding: 14px 16px;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .target-card h3 {
   font-size: 12px;
   font-weight: 700;
-  color: #1e40af;
+  color: #111827;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 8px;
@@ -121,7 +122,7 @@ body {
 .target-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #2563eb, #16a34a);
+  background: linear-gradient(90deg, #111827, #6b7280);
   transition: width 0.35s ease;
   width: 0%;
 }
@@ -192,7 +193,7 @@ input, select {
 input:focus, select:focus {
   border-color: var(--accent);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 input[type="number"] { font-size: 22px; font-weight: 700; }
 
@@ -216,7 +217,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 .shift-btn .label { font-size: 11px; font-weight: 600; color: var(--muted); }
 .shift-btn.selected {
   border-color: var(--accent);
-  background: #eff6ff;
+  background: #f3f4f6;
 }
 .shift-btn.selected .label { color: var(--accent); }
 
@@ -304,9 +305,9 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   font-weight: 700;
   margin-top: 4px;
 }
-.shift-Morning   { background: #fef3c7; color: var(--orange); }
-.shift-Afternoon { background: #eff6ff; color: var(--accent); }
-.shift-Evening   { background: #f5f3ff; color: #7c3aed; }
+.shift-Morning   { background: #f3f4f6; color: #111827; }
+.shift-Afternoon { background: #e5e7eb; color: #111827; }
+.shift-Evening   { background: #d1d5db; color: #111827; }
 .empty-state { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
 </style>
 </head>
@@ -828,6 +829,29 @@ async function submitSale() {
   }
 }
 
+async function deleteAttendance(attendanceId) {
+  if (!attendanceId) return;
+  if (!confirm('Remove this off day / leave entry? You can log the correct dates again.')) return;
+
+  const { data: deleted, error } = await sb
+    .from('ba_attendance_entries')
+    .delete()
+    .eq('id', attendanceId)
+    .select('id');
+
+  if (error) {
+    showMsg('Could not delete this entry. Try again or ask your manager.', 'error');
+    return;
+  }
+  if (!deleted || !deleted.length) {
+    showMsg('Could not delete — you may only remove your own leave entries.', 'error');
+    return;
+  }
+  showMsg('Leave/off day removed.', 'success');
+  invalidateMonthSalesCache();
+  await refreshBaDashboard();
+}
+
 async function deleteSale(saleId) {
   if (!saleId) return;
   if (!confirm('Delete this sale entry? This cannot be undone.')) return;
@@ -871,6 +895,12 @@ async function submitLeave() {
   const dates = enumerateDatesInclusive(from, till);
   if (!dates.length) return showMsg('Invalid date range.', 'error');
   if (dates.length > 62) return showMsg('Maximum 62 days at once. Use a shorter range.', 'error');
+
+  const statusLabel = attendanceStatusLabel(status);
+  const rangeLabel = dates.length === 1
+    ? formatDate(from)
+    : `${formatDate(from)} → ${formatDate(till)} (${dates.length} days)`;
+  if (!confirm(`Save ${statusLabel} for:\n${rangeLabel}\n\nCheck the dates are correct.`)) return;
 
   const btn = document.getElementById('leave-btn');
   btn.disabled = true;
@@ -941,6 +971,7 @@ async function loadHistory(monthSales) {
   }));
   const attRows = (attendance || []).map(a => ({
     kind: 'attendance',
+    id: a.id,
     entry_date: a.entry_date,
     created_at: a.created_at,
     status: a.status,
@@ -986,6 +1017,9 @@ async function loadHistory(monthSales) {
       `;
     }
     const statusLabel = attendanceStatusLabel(r.status);
+    const delBtn = r.id
+      ? `<button type="button" class="entry-delete" data-attendance-id="${r.id}">Delete</button>`
+      : '';
     return `
       <div class="entry-row">
         <div class="entry-left">
@@ -994,6 +1028,7 @@ async function loadHistory(monthSales) {
         </div>
         <div class="entry-right">
           <div class="entry-items">No sales expected</div>
+          ${delBtn}
         </div>
       </div>
     `;
@@ -1027,15 +1062,22 @@ function showMsg(text, type) {
 document.getElementById('history-list').addEventListener('click', (e) => {
   const btn = e.target && e.target.closest && e.target.closest('.entry-delete');
   if (!btn || !btn.getAttribute) return;
-  const id = btn.getAttribute('data-sale-id');
-  if (id) {
+  const saleId = btn.getAttribute('data-sale-id');
+  const attId = btn.getAttribute('data-attendance-id');
+  if (saleId) {
     e.preventDefault();
-    deleteSale(id);
+    deleteSale(saleId);
+    return;
+  }
+  if (attId) {
+    e.preventDefault();
+    deleteAttendance(attId);
   }
 });
 
 // Explicit globals for other inline handlers (submitSale, signOut, …).
 window.deleteSale = deleteSale;
+window.deleteAttendance = deleteAttendance;
 </script>
 </body>
 </html>
