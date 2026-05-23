@@ -2073,8 +2073,13 @@ function baPassesShopFilter(profile, cityFilter, monthKey) {
 
 function getProfileAttendanceStatus(profile, date, attById, attByName) {
   const idMap = profile.id ? attById.get(profile.id) : null;
+  if (idMap && idMap.has(date)) return idMap.get(date);
   const nameMap = attByName.get(profile.name);
-  return (idMap && idMap.get(date)) || (nameMap && nameMap.get(date)) || null;
+  if (nameMap && nameMap.has(date)) return nameMap.get(date);
+  const rosterFirst = profile.name.split(/\s+/)[0];
+  const shortMap = attByName.get(formatBaDisplayName(rosterFirst));
+  if (shortMap && shortMap.has(date)) return shortMap.get(date);
+  return null;
 }
 
 function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
@@ -2153,6 +2158,15 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
       }
     });
 
+    const attByDate = new Map();
+    attendanceEntries.forEach(e => {
+      if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+      if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
+      if (cityFilter && storeToManagerCity(e.store, e.team) !== cityFilter) return;
+      if (!entryMatchesProfile(e, profile)) return;
+      attByDate.set(normalizeEntryDate(e.entry_date), e.status || 'off_day');
+    });
+
     const cells = dates.map(date => {
       if (isCurrent && date > checkEnd) {
         return { date, status: 'future', label: 'Upcoming — not due yet' };
@@ -2163,7 +2177,7 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
         status = 'sales';
         label = 'Sales logged';
       } else {
-        const att = getProfileAttendanceStatus(profile, date, attById, attByName);
+        const att = attByDate.get(date) || getProfileAttendanceStatus(profile, date, attById, attByName);
         if (att === 'off_day') { status = 'off_day'; label = 'Off day'; }
         else if (att === 'annual_leave') { status = 'annual_leave'; label = 'Annual leave'; }
         else if (att === 'public_holiday') { status = 'public_holiday'; label = 'Public holiday'; }
