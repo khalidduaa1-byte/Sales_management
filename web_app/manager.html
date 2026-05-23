@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="BA Sales"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
-<link rel="icon" href="/icons/icon.svg" type="image/svg+xml"/>
-<link rel="apple-touch-icon" href="/icons/icon.svg"/>
+<link rel="icon" href="/icons/logo.svg" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="/icons/logo.svg"/>
 <title>Manager Dashboard</title>
 <script src="/pwa.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -42,13 +42,13 @@ header {
 .header-brand { display: flex; align-items: center; gap: 12px; }
 .brand-icon {
   width: 40px; height: 40px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
   flex-shrink: 0;
+  overflow: hidden;
+  background: #000;
 }
-.brand-icon svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.brand-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand-title { font-size: 17px; font-weight: 700; color: #111827; }
 .live-badge { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .live-dot {
@@ -408,7 +408,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   <div class="header-inner">
     <div class="header-brand">
       <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="5" height="14" rx="1"/><rect x="9.5" y="9" width="5" height="10" rx="1"/><rect x="17" y="13" width="5" height="6" rx="1"/></svg>
+        <img src="/icons/logo.svg" width="40" height="40" alt="Dolce &amp; Gabbana"/>
       </div>
       <div>
         <div class="brand-title">Manager Dashboard</div>
@@ -2051,7 +2051,14 @@ function monthCheckRange(monthKey) {
 
 function entryMatchesProfile(entry, profile) {
   if (entry.ba_id && profile.id && entry.ba_id === profile.id) return true;
-  return formatBaDisplayName(entry.ba_name) === profile.name;
+  const entryName = formatBaDisplayName(entry.ba_name);
+  if (entryName === profile.name) return true;
+  // Excel roster short name (e.g. "Nadine") vs signup name ("Nadine Taimour")
+  const profileFirst = profile.name.split(/\s+/)[0];
+  if (entryName && profileFirst && entryName.toLowerCase() === profileFirst.toLowerCase()) {
+    return true;
+  }
+  return false;
 }
 
 function baPassesShopFilter(profile, cityFilter, monthKey) {
@@ -2137,6 +2144,14 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
       ...(salesById.get(profile.id) || []),
       ...(salesByName.get(profile.name) || []),
     ]);
+    allEntries.forEach(e => {
+      if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+      if (teamFilter && canonicalTeamName(e.team) !== teamFilter) return;
+      if (cityFilter && storeToManagerCity(e.store, e.team) !== cityFilter) return;
+      if (entryMatchesProfile(e, profile)) {
+        salesDates.add(normalizeEntryDate(e.entry_date));
+      }
+    });
 
     const cells = dates.map(date => {
       if (isCurrent && date > checkEnd) {
