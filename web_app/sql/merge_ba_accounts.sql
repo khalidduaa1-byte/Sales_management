@@ -100,7 +100,11 @@ as $$
           ('ahmed abdelaal',  'Ahmed'),
           ('Esraa Abdullah',  'Esraa'),
           ('Mohamed Atef',    'Atef'),
-          ('Nouran adel',     'Nouran')
+          ('Nouran adel',     'Nouran'),
+          ('Besher Nasr',     'Besher'),
+          ('Basher Nasr',     'Besher'),
+          ('Bisher Naser',    'Besher'),
+          ('Nadine Taimour',  'Nadine')
       ) as m(registered_name, roster_name)
       where public.normalize_ba_name(m.registered_name) = public.normalize_ba_name(p_display_name)
       limit 1
@@ -155,7 +159,11 @@ insert into ba_merge_map (registered_name, roster_name) values
   ('ahmed abdelaal',  'Ahmed'),
   ('Esraa Abdullah',  'Esraa'),
   ('Mohamed Atef',    'Atef'),
-  ('Nouran adel',     'Nouran');
+  ('Nouran adel',     'Nouran'),
+  ('Besher Nasr',     'Besher'),
+  ('Basher Nasr',     'Besher'),
+  ('Bisher Naser',    'Besher'),
+  ('Nadine Taimour',  'Nadine');
   -- Add more rows below as needed:
   -- ('Full Name At Signup', 'ExcelName'),
 
