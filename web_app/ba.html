@@ -685,11 +685,24 @@ function baFirstName(fullName) {
   return part || 'there';
 }
 
+/** Uses the BA’s phone local time (Egypt when they’re home). */
+function cairoLocalHour() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Cairo',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(new Date());
+  const hourPart = parts.find((p) => p.type === 'hour');
+  return Number(hourPart?.value ?? new Date().getHours());
+}
+
+/** Egypt team — always Africa/Cairo, not the phone’s travel timezone. */
 function timeOfDayGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  const h = cairoLocalHour();
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  if (h >= 17 && h < 22) return 'Good evening';
+  return 'Hello'; // Cairo: before 5am or after 10pm
 }
 
 /** Matches manager dashboard: on target ≥100%, close ≥80%, else building/push. */
