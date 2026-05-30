@@ -32,12 +32,13 @@
   --bg: #f4f6f9;
   --card: #ffffff;
   --border: #e2e8f0;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --accent: #111827;
+  --accent-hover: #000000;
+  --focus-ring: rgba(0, 0, 0, 0.12);
   --text: #1e293b;
   --muted: #64748b;
-  --red: #dc2626;
-  --green: #16a34a;
+  --red: #374151;
+  --green: #111827;
   --radius: 16px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -124,7 +125,7 @@ input, select {
   transition: .15s;
   -webkit-appearance: none;
 }
-input:focus, select:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+input:focus, select:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--focus-ring); }
 input::placeholder { color: #94a3b8; }
 
 .btn {
@@ -142,6 +143,21 @@ input::placeholder { color: #94a3b8; }
 }
 .btn:hover { background: var(--accent-hover); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin: -4px 0 16px;
+  text-decoration: underline;
+}
+.btn-link:hover { color: var(--text); }
+#recovery-panel { display: none; margin-top: 8px; }
+#recovery-panel h2 { font-size: 16px; margin-bottom: 12px; }
+#forgot-wrap { display: none; text-align: right; }
 
 .msg {
   margin-top: 14px;
@@ -150,8 +166,8 @@ input::placeholder { color: #94a3b8; }
   font-size: 13px;
   display: none;
 }
-.msg.error   { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
-.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
+.msg.error   { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
+.msg.success { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
 
 .install-hint {
   margin-top: 14px;
@@ -160,15 +176,15 @@ input::placeholder { color: #94a3b8; }
   font-size: 12px;
   line-height: 1.45;
   color: var(--muted);
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
 }
 .install-hint strong { color: var(--text); }
 
 #pwa-install-banner { display: none; text-align: center; }
 .btn-install {
   width: 100%;
-  background: #0f766e;
+  background: #111827;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -178,7 +194,7 @@ input::placeholder { color: #94a3b8; }
   cursor: pointer;
   margin-bottom: 8px;
 }
-.btn-install:hover { background: #0d9488; }
+.btn-install:hover { background: #000000; }
 
 /* Register-only fields */
 #register-fields { display: none; }
@@ -231,9 +247,22 @@ input::placeholder { color: #94a3b8; }
 
     <label>Password</label>
     <input type="password" id="password" placeholder="••••••••" required minlength="6"/>
+    <p id="forgot-wrap">
+      <button type="button" class="btn-link" onclick="sendPasswordReset()">Forgot password?</button>
+    </p>
 
     <button class="btn" type="submit" id="submit-btn">Sign In</button>
   </form>
+
+  <div id="recovery-panel" class="card" style="box-shadow:none;padding:0;border:none">
+    <h2>Set new password</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.45">
+      You opened the reset link from your email. Choose a new password, then you can sign in.
+    </p>
+    <label>New password</label>
+    <input type="password" id="recovery-password" placeholder="At least 6 characters" minlength="6"/>
+    <button class="btn" type="button" style="margin-top:14px" onclick="completePasswordRecovery()">Save &amp; sign in</button>
+  </div>
 
   <div class="msg" id="msg"></div>
 
@@ -297,8 +326,79 @@ if (urlError) {
 (async () => {
   if (urlError) return; // don't redirect if we just got bounced back with an error
   const { data: { session } } = await sb.auth.getSession();
-  if (session) await redirectByRole(session.user.id);
+  if (session && !isPasswordRecoveryUrl()) await redirectByRole(session.user.id);
 })();
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') showPasswordRecoveryPanel();
+});
+
+function isPasswordRecoveryUrl() {
+  const h = window.location.hash || '';
+  return h.includes('type=recovery');
+}
+
+function showPasswordRecoveryPanel() {
+  document.getElementById('auth-form').style.display = 'none';
+  document.getElementById('recovery-panel').style.display = 'block';
+  document.getElementById('forgot-wrap').style.display = 'none';
+  document.querySelector('.tabs').style.display = 'none';
+  clearMsg();
+}
+
+if (isPasswordRecoveryUrl()) {
+  setTimeout(() => {
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) showPasswordRecoveryPanel();
+    });
+  }, 300);
+}
+
+document.getElementById('forgot-wrap').style.display = 'block';
+
+async function sendPasswordReset() {
+  const email = document.getElementById('email').value.trim();
+  if (!email) {
+    showMsg('Enter your email above, then tap Forgot password.', 'error');
+    return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  clearMsg();
+  try {
+    const redirectTo = window.location.origin + (window.location.pathname || '/');
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+    showMsg(
+      'Password reset email sent to ' + email + '. Check inbox and spam, open the link in Safari or Chrome (not WhatsApp), then set a new password.',
+      'success'
+    );
+  } catch (err) {
+    showMsg(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function completePasswordRecovery() {
+  const password = document.getElementById('recovery-password').value;
+  if (!password || password.length < 6) {
+    showMsg('Password must be at least 6 characters.', 'error');
+    return;
+  }
+  clearMsg();
+  try {
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw error;
+    const { data: { user }, error: userErr } = await sb.auth.getUser();
+    if (userErr || !user) throw userErr || new Error('Could not finish sign-in.');
+    clearLoginErrorFromUrl();
+    window.location.hash = '';
+    await redirectByRole(user.id);
+  } catch (err) {
+    showMsg(err.message, 'error');
+  }
+}
 
 // ── Tab switching ─────────────────────────────────────────────────
 let mode = 'login';
@@ -310,6 +410,9 @@ function switchTab(m) {
   document.getElementById('tab-register').classList.toggle('active', m === 'register');
   document.getElementById('register-fields').style.display = m === 'register' ? 'block' : 'none';
   document.getElementById('submit-btn').textContent = m === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('forgot-wrap').style.display = m === 'login' ? 'block' : 'none';
+  document.getElementById('recovery-panel').style.display = 'none';
+  document.getElementById('auth-form').style.display = 'block';
   clearMsg();
   if (m === 'register') loadRegistrationNames();
 }
