@@ -307,7 +307,47 @@ const sb = createClient(
 
 function clearLoginErrorFromUrl() {
   const path = window.location.pathname || '/';
-  if (window.location.search) window.history.replaceState({}, '', path);
+  window.history.replaceState({}, '', path);
+}
+
+function authParamsFromUrl() {
+  const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search || '');
+  return { hash, query };
+}
+
+let passwordRecoveryMode = false;
+
+function isPasswordRecoveryUrl() {
+  const { hash, query } = authParamsFromUrl();
+  if (hash.get('type') === 'recovery' || query.get('type') === 'recovery') return true;
+  if ((window.location.hash || '').includes('type=recovery')) return true;
+  return sessionStorage.getItem('ba_password_recovery') === '1';
+}
+
+function markPasswordRecoveryMode() {
+  passwordRecoveryMode = true;
+  sessionStorage.setItem('ba_password_recovery', '1');
+}
+
+function clearPasswordRecoveryMode() {
+  passwordRecoveryMode = false;
+  sessionStorage.removeItem('ba_password_recovery');
+}
+
+function showPasswordRecoveryPanel() {
+  markPasswordRecoveryMode();
+  document.getElementById('auth-form').style.display = 'none';
+  document.getElementById('recovery-panel').style.display = 'block';
+  document.getElementById('forgot-wrap').style.display = 'none';
+  const tabs = document.querySelector('.tabs');
+  if (tabs) tabs.style.display = 'none';
+  clearMsg();
+}
+
+function showRecoveryWaitingMessage() {
+  showPasswordRecoveryPanel();
+  showMsg('Reset link received — choose a new password below.', 'success');
 }
 
 // ── Show error when bounced back from ba.html / manager.html ─────
@@ -324,40 +364,42 @@ if (urlError) {
   m.style.display = 'block';
 }
 
-// ── If already logged in, redirect straight away ──────────────────
-// So BAs don't have to log in every time they open the app
-(async () => {
-  if (urlError) return; // don't redirect if we just got bounced back with an error
-  const { data: { session } } = await sb.auth.getSession();
-  if (session && !isPasswordRecoveryUrl()) await redirectByRole(session.user.id);
-})();
-
+// Password-reset link: show "Set new password" immediately (do not wait for session).
 sb.auth.onAuthStateChange((event) => {
-  if (event === 'PASSWORD_RECOVERY') showPasswordRecoveryPanel();
+  if (event === 'PASSWORD_RECOVERY') showRecoveryWaitingMessage();
 });
 
-function isPasswordRecoveryUrl() {
-  const h = window.location.hash || '';
-  return h.includes('type=recovery');
-}
-
-function showPasswordRecoveryPanel() {
-  document.getElementById('auth-form').style.display = 'none';
-  document.getElementById('recovery-panel').style.display = 'block';
-  document.getElementById('forgot-wrap').style.display = 'none';
-  document.querySelector('.tabs').style.display = 'none';
-  clearMsg();
-}
-
-if (isPasswordRecoveryUrl()) {
-  setTimeout(() => {
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) showPasswordRecoveryPanel();
-    });
-  }, 300);
-}
-
+if (isPasswordRecoveryUrl()) showRecoveryWaitingMessage();
 document.getElementById('forgot-wrap').style.display = 'block';
+
+// ── Session bootstrap (after Supabase reads hash / ?code= from email link) ──
+(async () => {
+  if (urlError) return;
+
+  const { query } = authParamsFromUrl();
+  const authCode = query.get('code');
+  if (authCode) {
+    try {
+      const { error } = await sb.auth.exchangeCodeForSession(authCode);
+      if (error) throw error;
+      // PKCE reset links often have ?code= only; event may be PASSWORD_RECOVERY or SIGNED_IN
+      if (!passwordRecoveryMode) showRecoveryWaitingMessage();
+    } catch (e) {
+      showMsg(e.message || 'Reset link expired. Use Forgot password again.', 'error');
+    }
+  }
+
+  // Let detectSessionInUrl finish parsing #access_token&type=recovery
+  await new Promise((r) => setTimeout(r, 250));
+
+  if (isPasswordRecoveryUrl() || passwordRecoveryMode) {
+    showPasswordRecoveryPanel();
+    return;
+  }
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await redirectByRole(session.user.id);
+})();
 
 async function sendPasswordReset() {
   const email = document.getElementById('email').value.trim();
@@ -369,11 +411,9 @@ async function sendPasswordReset() {
   btn.disabled = true;
   clearMsg();
   try {
-    const onLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-    const redirectTo = onLocal
-      ? LIVE_APP_URL
-      : window.location.origin + (window.location.pathname || '/');
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: LIVE_APP_URL,
+    });
     if (error) throw error;
     showMsg(
       'Password reset email sent to ' + email + '. Check inbox and spam, open the link in Safari or Chrome (not WhatsApp), then set a new password.',
@@ -398,8 +438,8 @@ async function completePasswordRecovery() {
     if (error) throw error;
     const { data: { user }, error: userErr } = await sb.auth.getUser();
     if (userErr || !user) throw userErr || new Error('Could not finish sign-in.');
+    clearPasswordRecoveryMode();
     clearLoginErrorFromUrl();
-    window.location.hash = '';
     await redirectByRole(user.id);
   } catch (err) {
     showMsg(err.message, 'error');
