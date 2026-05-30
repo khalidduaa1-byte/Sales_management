@@ -289,6 +289,9 @@ input::placeholder { color: #94a3b8; }
 // supabase.createClient connects our page to the database.
 // The URL and key tell it WHICH database to talk to.
 // The anon key is safe to expose in frontend code — it has limited permissions.
+// Password-reset links must land on the live app (not localhost). Dashboard resets use Site URL in Supabase too.
+const LIVE_APP_URL = 'https://sales-management-phi-blue.vercel.app';
+
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
@@ -366,7 +369,10 @@ async function sendPasswordReset() {
   btn.disabled = true;
   clearMsg();
   try {
-    const redirectTo = window.location.origin + (window.location.pathname || '/');
+    const onLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+    const redirectTo = onLocal
+      ? LIVE_APP_URL
+      : window.location.origin + (window.location.pathname || '/');
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
     showMsg(
