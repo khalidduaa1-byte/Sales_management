@@ -257,11 +257,15 @@ input::placeholder { color: #94a3b8; }
   <div id="recovery-panel" class="card" style="box-shadow:none;padding:0;border:none">
     <h2>Set new password</h2>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.45">
-      You opened the reset link from your email. Choose a new password, then you can sign in.
+      You opened a password-reset email link. Only use this if you need a <em>new</em> password.
+      If your manager already set your password, go back to Sign In.
     </p>
     <label>New password</label>
     <input type="password" id="recovery-password" placeholder="At least 6 characters" minlength="6"/>
     <button class="btn" type="button" style="margin-top:14px" onclick="completePasswordRecovery()">Save &amp; sign in</button>
+    <p style="margin-top:14px;text-align:center">
+      <button type="button" class="btn-link" onclick="showSignInPanel()">← Back to Sign In</button>
+    </p>
   </div>
 
   <div class="msg" id="msg"></div>
@@ -347,7 +351,21 @@ function showPasswordRecoveryPanel() {
 
 function showRecoveryWaitingMessage() {
   showPasswordRecoveryPanel();
-  showMsg('Reset link received — choose a new password below.', 'success');
+  showMsg('Reset link received — choose a new password below, or tap Back to Sign In.', 'success');
+}
+
+async function showSignInPanel() {
+  clearPasswordRecoveryMode();
+  window.location.hash = '';
+  window.history.replaceState({}, '', window.location.pathname || '/');
+  await sb.auth.signOut();
+  document.getElementById('recovery-panel').style.display = 'none';
+  document.getElementById('auth-form').style.display = 'block';
+  const tabs = document.querySelector('.tabs');
+  if (tabs) tabs.style.display = 'grid';
+  document.getElementById('forgot-wrap').style.display = 'block';
+  switchTab('login');
+  clearMsg();
 }
 
 // ── Show error when bounced back from ba.html / manager.html ─────
