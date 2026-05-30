@@ -23,9 +23,9 @@
   --accent: #111827;
   --accent-hover: #000000;
   --focus-ring: rgba(0, 0, 0, 0.12);
-  --green: #16a34a;
-  --orange: #d97706;
-  --red: #dc2626;
+  --green: #111827;
+  --orange: #4b5563;
+  --red: #374151;
   --text: #1e293b;
   --muted: #64748b;
   --radius: 16px;
@@ -85,6 +85,24 @@ body {
   border-radius: 14px;
   padding: 14px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.ba-greeting {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1e293b;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.ba-greeting strong { font-weight: 700; color: #111827; }
+.target-card.target-on .target-bar-fill {
+  background: linear-gradient(90deg, #111827, #374151);
+}
+.target-card.target-close .target-bar-fill {
+  background: linear-gradient(90deg, #374151, #6b7280);
+}
+.target-card.target-push .target-bar-fill {
+  background: linear-gradient(90deg, #9ca3af, #6b7280);
 }
 .target-card h3 {
   font-size: 12px;
@@ -252,8 +270,8 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   margin-bottom: 16px;
   display: none;
 }
-.msg.error   { background: #fef2f2; color: var(--red);   border: 1px solid #fecaca; }
-.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
+.msg.error   { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
+.msg.success { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
 
 /* ── History ── */
 .history-card {
@@ -287,16 +305,16 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 .entry-items  { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .entry-delete {
   margin-top: 8px;
-  border: 1px solid #fecaca;
-  background: #fff1f2;
-  color: #dc2626;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
   border-radius: 8px;
   font-size: 11px;
   font-weight: 700;
   padding: 5px 8px;
   cursor: pointer;
 }
-.entry-delete:hover { background: #ffe4e6; }
+.entry-delete:hover { background: #e5e7eb; }
 .shift-tag {
   display: inline-block;
   padding: 2px 8px;
@@ -326,6 +344,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 
 <div class="target-banner" id="target-banner-wrap">
   <div class="target-card" id="target-card">
+    <p class="ba-greeting" id="ba-greeting">Loading your month…</p>
     <h3 id="target-month-title">Monthly target</h3>
     <div class="target-row">
       <div class="big" id="target-attain-pct">—</div>
@@ -478,6 +497,7 @@ let monthSalesCache = { key: null, rows: null };
   // Update the header
   document.getElementById('ba-name').textContent = profile.name;
   document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
+  updateBaGreeting({ hasTarget: false, pct: 0, remain: 0, goal: 0 });
 
   populateShopOptions();
   setDefaultDates();
@@ -660,6 +680,62 @@ async function computePersonalMonthlyTarget(monthKey, teamCanon) {
   return { goal: share, mode: 'team_total', teamGoal: value, teamBas: n, raw: tRow };
 }
 
+function baFirstName(fullName) {
+  const part = String(fullName || '').trim().split(/\s+/)[0];
+  return part || 'there';
+}
+
+function timeOfDayGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/** Matches manager dashboard: on target ≥100%, close ≥80%, else building/push. */
+function targetAttainmentTier(pct) {
+  if (pct >= 100) return 'on';
+  if (pct >= 80) return 'close';
+  if (pct >= 50) return 'building';
+  return 'push';
+}
+
+function formatMoneyShort(n) {
+  return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function updateBaGreeting({ hasTarget, pct, remain, goal }) {
+  const el = document.getElementById('ba-greeting');
+  const card = document.getElementById('target-card');
+  if (!el || !currentProfile) return;
+
+  const hello = timeOfDayGreeting();
+  const name = baFirstName(currentProfile.name);
+  card.classList.remove('target-on', 'target-close', 'target-building', 'target-push');
+
+  if (!hasTarget) {
+    el.innerHTML =
+      `<strong>${hello}, ${name}.</strong> ` +
+      `Your sales are tracking — your manager will set the <strong>${canonicalTeamName(currentProfile.team) || 'team'}</strong> target soon.`;
+    return;
+  }
+
+  const tier = targetAttainmentTier(pct);
+  card.classList.add('target-' + tier);
+  let line;
+  if (tier === 'on') {
+    line = `You're <strong>on target</strong> at ${pct.toFixed(0)}% — outstanding month. Keep it up.`;
+  } else if (tier === 'close') {
+    line = `You're at <strong>${pct.toFixed(0)}%</strong> — almost there. A strong finish gets you over the line.`;
+  } else if (tier === 'building') {
+    line = `<strong>${pct.toFixed(0)}%</strong> of your goal — good momentum. <strong>$${formatMoneyShort(remain)}</strong> still to go.`;
+  } else {
+    line =
+      `<strong>${pct.toFixed(0)}%</strong> so far — <strong>$${formatMoneyShort(remain)}</strong> to reach your target. Every shift counts.`;
+  }
+  el.innerHTML = `<strong>${hello}, ${name}.</strong> ${line}`;
+}
+
 async function renderTargetBanner(monthSales) {
   const pctEl = document.getElementById('target-attain-pct');
   const subEl = document.getElementById('target-attain-sub');
@@ -684,6 +760,7 @@ async function renderTargetBanner(monthSales) {
   const mySales = sumSalesAmount(monthSales || []);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
+    updateBaGreeting({ hasTarget: false, pct: 0, remain: 0, goal: 0 });
     pctEl.textContent = '—';
     subEl.textContent = 'No target set';
     footEl.innerHTML = `Your sales <strong>${formatMonthLabel(monthKey)}</strong>: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
@@ -693,6 +770,7 @@ async function renderTargetBanner(monthSales) {
 
   const pct = Math.min(150, (mySales / goal) * 100);
   const remain = Math.max(0, goal - mySales);
+  updateBaGreeting({ hasTarget: true, pct, remain, goal });
 
   pctEl.textContent = `${pct.toFixed(0)}%`;
   subEl.innerHTML =
