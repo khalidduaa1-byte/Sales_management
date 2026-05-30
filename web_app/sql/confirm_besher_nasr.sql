@@ -1,6 +1,7 @@
 -- Confirm Besher Nasr can sign in (no email link required)
 -- beshernasr6@gmail.com — cc619b38-1ed0-4b3c-b774-23a4087cc9a2
--- Run in Supabase SQL Editor, then reset password in Auth (see index.html forgot password or Dashboard).
+-- Run in Supabase SQL Editor.
+-- Set password without email: scripts/set_ba_password.sh (service_role key from Settings → API).
 
 update auth.users
 set email_confirmed_at = coalesce(email_confirmed_at, now())
