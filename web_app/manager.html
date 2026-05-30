@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<meta name="theme-color" content="#2563eb"/>
+<meta name="theme-color" content="#000000"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
@@ -53,7 +53,7 @@ header {
 .live-badge { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .live-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #10b981;
+  background: #111827;
   animation: pulse 2s infinite;
 }
 @keyframes pulse {
@@ -111,12 +111,12 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   display: flex; align-items: center; justify-content: center;
 }
 .kpi-icon svg { width: 17px; height: 17px; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.kpi-icon.blue   { background: #eff6ff; } .kpi-icon.blue   svg { stroke: #2563eb; }
-.kpi-icon.green  { background: #f0fdf4; } .kpi-icon.green  svg { stroke: #059669; }
-.kpi-icon.purple { background: #f5f3ff; } .kpi-icon.purple svg { stroke: #7c3aed; }
-.kpi-icon.orange { background: #fff7ed; } .kpi-icon.orange svg { stroke: #ea580c; }
-.kpi-icon.pink   { background: #fdf2f8; } .kpi-icon.pink   svg { stroke: #db2777; }
-.kpi-icon.indigo { background: #eef2ff; } .kpi-icon.indigo svg { stroke: #4f46e5; }
+.kpi-icon.blue   { background: #f3f4f6; } .kpi-icon.blue   svg { stroke: #111827; }
+.kpi-icon.green  { background: #e5e7eb; } .kpi-icon.green  svg { stroke: #374151; }
+.kpi-icon.purple { background: #d1d5db; } .kpi-icon.purple svg { stroke: #111827; }
+.kpi-icon.orange { background: #f3f4f6; } .kpi-icon.orange svg { stroke: #4b5563; }
+.kpi-icon.pink   { background: #e5e7eb; } .kpi-icon.pink   svg { stroke: #6b7280; }
+.kpi-icon.indigo { background: #d1d5db; } .kpi-icon.indigo svg { stroke: #000000; }
 .kpi-val { font-size: 22px; font-weight: 800; color: #111827; line-height: 1.1; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-lbl { font-size: 11px; color: #6b7280; }
 
@@ -144,8 +144,8 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   padding: 3px 10px; border-radius: 99px;
   font-size: 11px; font-weight: 600;
 }
-.on-track  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-.behind    { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.on-track  { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
+.behind    { background: #e5e7eb; color: #374151; border: 1px solid #9ca3af; }
 .target-right { text-align: right; }
 .target-big { font-size: 26px; font-weight: 800; color: #111827; line-height: 1; }
 .target-sub { font-size: 11px; color: #6b7280; margin-top: 3px; }
@@ -163,6 +163,8 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   margin-bottom: 28px;
 }
 @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+.charts-row.charts-row-2eq { grid-template-columns: 1fr 1fr; }
+.charts-row.charts-row-full { grid-template-columns: 1fr; }
 .chart-card {
   background: #fff; border: 1px solid #e5e7eb;
   border-radius: 14px; padding: 20px;
@@ -183,7 +185,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   font-size: 13px; color: #374151; outline: none;
   -webkit-appearance: none; cursor: pointer; min-width: 130px;
 }
-.f-sel:focus, .f-date:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.f-sel:focus, .f-date:focus { border-color: #111827; box-shadow: 0 0 0 3px rgba(0,0,0,.1); }
 .btn-reset {
   padding: 8px 16px; background: #fff; border: 1px solid #d1d5db;
   border-radius: 8px; font-size: 13px; color: #374151; cursor: pointer; transition: background .15s;
@@ -197,7 +199,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   padding: 7px 16px; border-radius: 8px; border: 1px solid #e5e7eb;
   background: #fff; color: #374151; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s;
 }
-.btn-view.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn-view.active { background: #111827; color: #fff; border-color: #111827; }
 .btn-view:not(.active):hover { background: #f9fafb; }
 
 /* ── Table ── */
@@ -216,25 +218,25 @@ th {
   white-space: nowrap; cursor: pointer; user-select: none;
 }
 th svg { width: 11px; height: 11px; vertical-align: middle; margin-left: 4px; }
-th.sorted { color: #2563eb; }
+th.sorted { color: #111827; }
 td {
   padding: 13px 18px; border-bottom: 1px solid #f3f4f6;
   font-size: 13px; color: #374151; white-space: nowrap;
 }
 tr:last-child td { border-bottom: none; }
-tr.row-top td  { background: #f0fdf4; }
-tr.row-low td  { background: #fef2f2; }
+tr.row-top td  { background: #f3f4f6; }
+tr.row-low td  { background: #e5e7eb; }
 tr:not(.row-top):not(.row-low):hover td { background: #f9fafb; }
 td.cell-name   { font-weight: 700; color: #111827; }
 td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
 .shift-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
-.sM { background: #fef3c7; color: #b45309; }
-.sA { background: #eff6ff; color: #1d4ed8; }
-.sE { background: #f5f3ff; color: #6d28d9; }
+.sM { background: #e5e7eb; color: #111827; }
+.sA { background: #e5e7eb; color: #111827; }
+.sE { background: #d1d5db; color: #374151; }
 .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-.tCairo    { background: #059669; }
-.tSharm    { background: #2563eb; }
-.tHurgadah { background: #ea580c; }
+.tCairo    { background: #111827; }
+.tSharm    { background: #4b5563; }
+.tHurgadah { background: #6b7280; }
 .tbl-footer { padding: 10px 18px; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
 
 /* ── Heatmap ── */
@@ -292,8 +294,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   cursor: pointer;
 }
 .page-tab-btn.active {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #111827;
+  border-color: #111827;
   color: #fff;
 }
 .miss-summary {
@@ -309,8 +311,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   font-size: 11px;
   font-weight: 700;
 }
-.miss-badge.warn { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-.miss-badge.ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.miss-badge.warn { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
+.miss-badge.ok { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
 .miss-dates { font-size: 12px; color: #6b7280; line-height: 1.5; max-width: 520px; }
 .cal-legend {
   display: flex; flex-wrap: wrap; gap: 10px 18px;
@@ -389,16 +391,16 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   font-size: 14px; font-weight: 800;
   cursor: default;
 }
-.cal-cell-sold { background: #dcfce7; color: #15803d; }
-.cal-cell-miss { background: #fef2f2; color: #dc2626; }
-.cal-cell-off { background: #fef9c3; color: #a16207; font-size: 10px; }
-.cal-cell-al { background: #dbeafe; color: #1d4ed8; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-ph { background: #e0e7ff; color: #4338ca; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-sl { background: #fce7f3; color: #be185d; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-other { background: #f3e8ff; color: #7c3aed; font-size: 10px; }
+.cal-cell-sold { background: #111827; color: #fff; }
+.cal-cell-miss { background: #fff; color: #111827; border: 2px solid #111827; }
+.cal-cell-off { background: #e5e7eb; color: #374151; font-size: 10px; }
+.cal-cell-al { background: #d1d5db; color: #111827; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-ph { background: #9ca3af; color: #fff; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-sl { background: #6b7280; color: #fff; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-other { background: #f3f4f6; color: #4b5563; font-size: 10px; border: 1px solid #d1d5db; }
 .cal-cell-future { background: #f9fafb; color: #d1d5db; font-size: 12px; font-weight: 500; }
 .cal-day-th.future-day .cal-day-num { color: #9ca3af; }
-.cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #dc2626; }
+.cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #111827; }
 </style>
 </head>
 <body>
@@ -435,6 +437,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <button class="page-tab-btn" id="tab-targets" onclick="setMainTab('targets')">Targets & Commissions</button>
       <button class="page-tab-btn" id="tab-daily" onclick="setMainTab('daily')">Daily BA Sales</button>
       <button class="page-tab-btn" id="tab-profile" onclick="setMainTab('profile')">BA Profile</button>
+      <button class="page-tab-btn" id="tab-shops" onclick="setMainTab('shops')">Shops</button>
       <button class="page-tab-btn" id="tab-missing" onclick="setMainTab('missing')">Missing Sales</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -538,8 +541,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="filter-card perf-section">
+  <!-- Filters (Performance + Shops tabs) -->
+  <div class="filter-card shared-filter-section">
     <div class="filter-row">
       <select class="f-sel" id="f-team"  onchange="applyFilters()">
         <option value="">All Teams</option>
@@ -701,6 +704,45 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
+  <!-- Shop performance -->
+  <div class="sec-lbl shop-section" style="display:none">Shop performance — <span id="shop-month-lbl">—</span></div>
+  <p class="shop-section" id="shop-filter-note" style="display:none;font-size:12px;color:#6b7280;margin:-6px 0 14px"></p>
+  <div class="charts-row charts-row-2eq shop-section" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title">Sales share by shop</div>
+      <div id="chart-shop-sales-pie" style="height:300px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">PCs share by shop</div>
+      <div id="chart-shop-pcs-pie" style="height:300px"></div>
+    </div>
+  </div>
+  <div class="charts-row charts-row-full shop-section" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title">Sales by shop (ranked)</div>
+      <div id="chart-shop-sales-bar" style="height:max(260px,auto);min-height:260px"></div>
+    </div>
+  </div>
+  <div class="table-card shop-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Shop</th>
+          <th>Team</th>
+          <th>Sales ($)</th>
+          <th>PCs</th>
+          <th>% Sales</th>
+          <th>% PCs</th>
+          <th># Shifts</th>
+        </tr></thead>
+        <tbody id="shop-tbl-body">
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tbl-footer" id="shop-tbl-footer"></div>
+  </div>
+
 </main>
 
 <script>
@@ -733,7 +775,7 @@ const TARGETS = {
     Hurgadah: { type: "team_total", value: 40000 },
   },
 };
-const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
+const TEAM_COLORS = { Cairo: '#111827', Sharm: '#4b5563', Hurgadah: '#6b7280' };
 
 let allEntries = [];
 let attendanceEntries = [];
@@ -1040,6 +1082,12 @@ function setMainTab(tab) {
   document.querySelectorAll('.perf-section').forEach(el => {
     el.style.display = tab === 'performance' ? '' : 'none';
   });
+  document.querySelectorAll('.shared-filter-section').forEach(el => {
+    el.style.display = (tab === 'performance' || tab === 'shops') ? '' : 'none';
+  });
+  document.querySelectorAll('.shop-section').forEach(el => {
+    el.style.display = tab === 'shops' ? '' : 'none';
+  });
   document.querySelectorAll('.target-section').forEach(el => {
     el.style.display = tab === 'targets' ? '' : 'none';
   });
@@ -1056,11 +1104,13 @@ function setMainTab(tab) {
   document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
   document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
   document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
+  document.getElementById('tab-shops').classList.toggle('active', tab === 'shops');
   document.getElementById('tab-missing').classList.toggle('active', tab === 'missing');
   if (tab === 'daily') renderDailySales();
   if (tab === 'profile') renderBAProfile();
   if (tab === 'missing') renderMissingSubmissions();
   if (tab === 'performance') refreshPerformanceCharts();
+  if (tab === 'shops') refreshShopCharts();
 }
 
 async function loadTeamHeadcount() {
@@ -1233,20 +1283,20 @@ function last7WindowForMonth(monthKey) {
 function showPageError(msg) {
   const targetMsg = document.getElementById('target-msg');
   if (targetMsg) {
-    targetMsg.style.color = '#dc2626';
+    targetMsg.style.color = '#374151';
     targetMsg.textContent = msg;
   }
   const body = document.getElementById('tbl-body');
   if (body) {
-    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#374151">${msg}</td></tr>`;
   }
   const dailyBody = document.getElementById('daily-body');
   if (dailyBody) {
-    dailyBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    dailyBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:#374151">${msg}</td></tr>`;
   }
   const commBody = document.getElementById('comm-body');
   if (commBody) {
-    commBody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:#dc2626">${msg}</td></tr>`;
+    commBody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:#374151">${msg}</td></tr>`;
   }
 }
 
@@ -1298,6 +1348,7 @@ function applyFilters() {
   renderTargets(roll);
   renderCommissions();
   renderCharts(e);
+  if (mainTab === 'shops') renderShopAnalytics(e);
   if (viewMode === 'table') renderTable(e);
   else renderHeatmap(e);
   if (mainTab === 'daily') renderDailySales();
@@ -1305,6 +1356,9 @@ function applyFilters() {
   if (mainTab === 'missing') renderMissingSubmissions();
   if (mainTab === 'performance') {
     requestAnimationFrame(() => plotlyResizeBothCharts());
+  }
+  if (mainTab === 'shops') {
+    requestAnimationFrame(() => plotlyResizeShopCharts());
   }
 }
 
@@ -1378,9 +1432,9 @@ function renderTargets(entries) {
       ? (dailyNeed <= 0 ? true : (avg7Sales !== null ? avg7Sales >= dailyNeed : true))
       : true;
 
-    const barGrad = pct >= 95 ? 'linear-gradient(90deg,#059669,#10b981)'
-                  : pct >= 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)'
-                  :             'linear-gradient(90deg,#f59e0b,#ef4444)';
+    const barGrad = pct >= 95 ? 'linear-gradient(90deg,#111827,#374151)'
+                  : pct >= 75 ? 'linear-gradient(90deg,#374151,#6b7280)'
+                  :             'linear-gradient(90deg,#9ca3af,#d1d5db)';
     const c = TEAM_COLORS[team];
 
     return { team, html: `<div class="target-card">
@@ -1400,7 +1454,7 @@ function renderTargets(entries) {
       <div class="target-stats">
         <div><div class="ts-lbl">Remaining</div><div class="ts-val">${rem !== null ? '$'+(rem/1000).toFixed(1)+'k' : '—'}</div></div>
         <div><div class="ts-lbl">Daily needed</div><div class="ts-val">${dailyNeed > 0 ? '$'+(dailyNeed/1000).toFixed(1)+'k' : '—'}</div></div>
-        <div><div class="ts-lbl">Last 7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">${avg7Qty === null ? '—' : (avg7Qty.toFixed(1) + ' pcs')}</div></div>
+        <div><div class="ts-lbl">Last 7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#111827':'#6b7280'}">${avg7Qty === null ? '—' : (avg7Qty.toFixed(1) + ' pcs')}</div></div>
       </div>
     </div>`,
       pct,
@@ -1437,7 +1491,7 @@ async function saveTarget() {
     msgEl.textContent = 'Could not save target. Try again.';
     return;
   }
-  msgEl.style.color = '#059669';
+  msgEl.style.color = '#111827';
   msgEl.textContent = `Saved ${team} target for ${monthLabel(month)}.`;
   await loadMonthlyTargets();
   buildMonthFilter();
@@ -1631,8 +1685,8 @@ function renderCharts(entries) {
   const sorted = Object.entries(byBA).sort((a, b) => b[1] - a[1]).slice(0, 14);
   const bN = sorted.map(([n]) => n);
   const bV = sorted.map(([, v]) => v);
-  const bC = sorted.map((_, i) => `rgba(5,150,105,${Math.max(0.3, 1 - i * 0.055)})`);
-  if (sorted.length) bC[0] = '#059669';
+  const bC = sorted.map((_, i) => `rgba(17,24,39,${Math.max(0.35, 1 - i * 0.055)})`);
+  if (sorted.length) bC[0] = '#111827';
 
   Plotly.react('chart-ba', [{ type: 'bar', x: bN, y: bV, marker: { color: bC, line: { width: 0 } },
     hovertemplate: '<b>%{x}</b><br>%{y} PCs<extra></extra>' }], {
@@ -1664,6 +1718,184 @@ function renderCharts(entries) {
     xaxis: { tickangle: -40, tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6', linecolor: '#e5e7eb' },
     yaxis: { tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6' },
   }, { responsive: true, displayModeBar: false });
+}
+
+// ── Shop analytics ───────────────────────────────────────────────
+function aggregateByStore(entries) {
+  const byStore = {};
+  entries.forEach(e => {
+    const store = String(e.store || '').trim() || 'Unspecified';
+    if (!byStore[store]) {
+      byStore[store] = { store, sales: 0, pcs: 0, rows: 0, teams: {} };
+    }
+    const r = byStore[store];
+    r.sales += Number(e.sales_amount) || 0;
+    r.pcs += Number(e.items_sold) || 0;
+    r.rows += 1;
+    const team = e.team || '';
+    if (team) r.teams[team] = (r.teams[team] || 0) + 1;
+  });
+  return Object.values(byStore).map(r => {
+    const ranked = Object.entries(r.teams).sort((a, b) => b[1] - a[1]);
+    let team = '—';
+    if (ranked.length === 1) team = ranked[0][0];
+    else if (ranked.length > 1) team = 'Mixed';
+    return { store: r.store, team, sales: r.sales, pcs: r.pcs, rows: r.rows };
+  }).sort((a, b) => b.sales - a.sales);
+}
+
+function shopFilterSubtitle() {
+  const city = getManagerCityFilter();
+  const team = document.getElementById('f-team')?.value || '';
+  const ba = document.getElementById('f-ba')?.value || '';
+  const parts = [city || 'All cities'];
+  if (team) parts.push(team);
+  if (ba) parts.push(ba);
+  return parts.join(' · ');
+}
+
+function shopPieColors(n) {
+  return Array.from({ length: n }, (_, i) =>
+    `rgba(17,24,39,${Math.max(0.35, 1 - i * (0.65 / Math.max(n - 1, 1))})`
+  );
+}
+
+function plotlyResizeShopCharts() {
+  if (!window.Plotly) return;
+  ['chart-shop-sales-pie', 'chart-shop-pcs-pie', 'chart-shop-sales-bar'].forEach(id => {
+    const gd = document.getElementById(id);
+    if (gd) Plotly.Plots.resize(gd);
+  });
+}
+
+function refreshShopCharts() {
+  renderShopAnalytics(filtered());
+  requestAnimationFrame(() => plotlyResizeShopCharts());
+}
+
+function renderShopAnalytics(entries) {
+  const monthKey = getGlobalMonthRaw() || getSelectedMonth();
+  const monthLbl = document.getElementById('shop-month-lbl');
+  const noteEl = document.getElementById('shop-filter-note');
+  const tbody = document.getElementById('shop-tbl-body');
+  const footer = document.getElementById('shop-tbl-footer');
+  if (monthLbl) monthLbl.textContent = monthLabel(monthKey);
+  if (noteEl) {
+    const cityHint = getManagerCityFilter() ? '' : ' Pick a city above for a clearer pie chart.';
+    noteEl.textContent = `Filters: ${shopFilterSubtitle()}.${cityHint} Share = portion of filtered month (not shop targets).`;
+  }
+
+  const layoutBase = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: '#fafafa',
+    font: { family: '-apple-system,sans-serif', color: '#374151' },
+    margin: { t: 10, b: 10, l: 10, r: 10 },
+    showlegend: true,
+    legend: { orientation: 'h', y: -0.12, font: { size: 10 } },
+  };
+  const layoutEmpty = {
+    ...layoutBase,
+    annotations: [{
+      text: 'No data for current filters',
+      xref: 'paper',
+      yref: 'paper',
+      x: 0.5,
+      y: 0.5,
+      showarrow: false,
+      font: { size: 13, color: '#9ca3af' },
+    }],
+  };
+  const plotOpts = { responsive: true, displayModeBar: false };
+
+  if (!window.Plotly) return;
+
+  const rows = aggregateByStore(entries);
+  if (!rows.length) {
+    Plotly.react('chart-shop-sales-pie', [{ type: 'pie', labels: [], values: [] }], layoutEmpty, plotOpts);
+    Plotly.react('chart-shop-pcs-pie', [{ type: 'pie', labels: [], values: [] }], layoutEmpty, plotOpts);
+    Plotly.react('chart-shop-sales-bar', [{ type: 'bar', x: [], y: [] }], {
+      ...layoutBase,
+      margin: { t: 10, b: 40, l: 120, r: 20 },
+      xaxis: { visible: false },
+      yaxis: { visible: false },
+    }, plotOpts);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
+    }
+    if (footer) footer.textContent = '';
+    return;
+  }
+
+  const totalSales = rows.reduce((s, r) => s + r.sales, 0);
+  const totalPcs = rows.reduce((s, r) => s + r.pcs, 0);
+  const labels = rows.map(r => r.store);
+  const colors = shopPieColors(labels.length);
+  if (colors.length) colors[0] = '#111827';
+
+  const pieLayout = {
+    ...layoutBase,
+    margin: { t: 10, b: 60, l: 10, r: 10 },
+  };
+
+  Plotly.react('chart-shop-sales-pie', [{
+    type: 'pie',
+    labels,
+    values: rows.map(r => r.sales),
+    hole: 0.45,
+    textinfo: 'percent',
+    textposition: 'inside',
+    marker: { colors },
+    hovertemplate: '<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>',
+  }], pieLayout, plotOpts);
+
+  Plotly.react('chart-shop-pcs-pie', [{
+    type: 'pie',
+    labels,
+    values: rows.map(r => r.pcs),
+    hole: 0.45,
+    textinfo: 'percent',
+    textposition: 'inside',
+    marker: { colors },
+    hovertemplate: '<b>%{label}</b><br>%{value} PCs<br>%{percent}<extra></extra>',
+  }], pieLayout, plotOpts);
+
+  const barH = Math.max(260, rows.length * 36);
+  const barEl = document.getElementById('chart-shop-sales-bar');
+  if (barEl) barEl.style.height = barH + 'px';
+
+  Plotly.react('chart-shop-sales-bar', [{
+    type: 'bar',
+    orientation: 'h',
+    y: labels.slice().reverse(),
+    x: rows.map(r => r.sales).reverse(),
+    marker: { color: colors.slice().reverse(), line: { width: 0 } },
+    hovertemplate: '<b>%{y}</b><br>$%{x:,.0f}<extra></extra>',
+  }], {
+    ...layoutBase,
+    showlegend: false,
+    margin: { t: 10, b: 40, l: Math.min(220, Math.max(120, labels.reduce((m, s) => Math.max(m, s.length), 0) * 7)), r: 24 },
+    xaxis: { tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6' },
+    yaxis: { automargin: true, tickfont: { size: 11, color: '#374151' } },
+  }, plotOpts);
+
+  if (tbody) {
+    tbody.innerHTML = rows.map(r => {
+      const pctSales = totalSales ? (r.sales / totalSales) * 100 : 0;
+      const pctPcs = totalPcs ? (r.pcs / totalPcs) * 100 : 0;
+      return `<tr>
+        <td class="cell-name">${r.store}</td>
+        <td>${r.team}</td>
+        <td class="cell-amount">$${fmt(r.sales)}</td>
+        <td>${r.pcs}</td>
+        <td>${pctSales.toFixed(1)}%</td>
+        <td>${pctPcs.toFixed(1)}%</td>
+        <td>${r.rows}</td>
+      </tr>`;
+    }).join('');
+  }
+  if (footer) {
+    footer.textContent = `${rows.length} shop${rows.length !== 1 ? 's' : ''} · $${fmt(totalSales)} sales · ${totalPcs} PCs`;
+  }
 }
 
 // ── Table ────────────────────────────────────────────────────────
@@ -2424,8 +2656,8 @@ function renderHeatmap(entries) {
   if (!baList.length) { document.getElementById('hmap-body').innerHTML='<p style="color:#9ca3af;padding:20px">No data</p>'; return; }
   const all = baList.flatMap(b => DAYS.map(d => baMap[b][d]));
   const max = Math.max(...all)||1;
-  const gc = v => !v?'#f3f4f6': v/max>.75?'#059669': v/max>.5?'#10b981': v/max>.25?'#6ee7b7':'#d1fae5';
-  const tc = v => !v?'#9ca3af':'#065f46';
+  const gc = v => !v?'#f3f4f6': v/max>.75?'#111827': v/max>.5?'#374151': v/max>.25?'#9ca3af':'#e5e7eb';
+  const tc = v => !v?'#9ca3af':'#111827';
   document.getElementById('hmap-body').innerHTML = `
     <table class="hmap">
       <thead><tr><th style="text-align:left;min-width:120px">BA</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
