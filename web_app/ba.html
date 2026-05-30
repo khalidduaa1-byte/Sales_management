@@ -726,9 +726,13 @@ function updateBaGreeting({ hasTarget, pct, remain, goal }) {
   if (tier === 'on') {
     line = `You're <strong>on target</strong> at ${pct.toFixed(0)}% — outstanding month. Keep it up.`;
   } else if (tier === 'close') {
-    line = `You're at <strong>${pct.toFixed(0)}%</strong> — almost there. A strong finish gets you over the line.`;
+    line =
+      `You're at <strong>${pct.toFixed(0)}%</strong> — the target is in sight. ` +
+      `<strong>$${formatMoneyShort(remain)}</strong> to go; finish the month on a high note.`;
   } else if (tier === 'building') {
-    line = `<strong>${pct.toFixed(0)}%</strong> of your goal — good momentum. <strong>$${formatMoneyShort(remain)}</strong> still to go.`;
+    line =
+      `<strong>${pct.toFixed(0)}%</strong> toward your goal — solid progress so far. ` +
+      `Stay consistent; <strong>$${formatMoneyShort(remain)}</strong> left to close the gap.`;
   } else {
     line =
       `<strong>${pct.toFixed(0)}%</strong> so far — <strong>$${formatMoneyShort(remain)}</strong> to reach your target. Every shift counts.`;
