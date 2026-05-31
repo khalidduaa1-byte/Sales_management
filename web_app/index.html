@@ -309,6 +309,11 @@ const sb = createClient(
   }
 );
 
+// Declared early so any code path (including stale-cache reloads) sees the binding initialized
+// before functions like switchTab read or write it. Older versions had this further down and
+// hit "Cannot access 'mode' before initialization" on cached devices.
+let mode = 'login';
+
 function clearLoginErrorFromUrl() {
   const path = window.location.pathname || '/';
   window.history.replaceState({}, '', path);
@@ -483,8 +488,6 @@ async function completePasswordRecovery() {
   }
 }
 
-// ── Tab switching ─────────────────────────────────────────────────
-let mode = 'login';
 let registrationNamesLoaded = false;
 
 function switchTab(m) {
