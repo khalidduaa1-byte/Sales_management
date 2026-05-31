@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<meta name="theme-color" content="#000000"/>
+<meta name="theme-color" content="#2563eb"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
@@ -42,18 +42,19 @@ header {
 .header-brand { display: flex; align-items: center; gap: 12px; }
 .brand-icon {
   width: 40px; height: 40px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
   flex-shrink: 0;
   overflow: hidden;
-  background: #000;
 }
 .brand-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand-title { font-size: 17px; font-weight: 700; color: #111827; }
 .live-badge { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .live-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #111827;
+  background: #10b981;
   animation: pulse 2s infinite;
 }
 @keyframes pulse {
@@ -111,12 +112,12 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   display: flex; align-items: center; justify-content: center;
 }
 .kpi-icon svg { width: 17px; height: 17px; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.kpi-icon.blue   { background: #f3f4f6; } .kpi-icon.blue   svg { stroke: #111827; }
-.kpi-icon.green  { background: #e5e7eb; } .kpi-icon.green  svg { stroke: #374151; }
-.kpi-icon.purple { background: #d1d5db; } .kpi-icon.purple svg { stroke: #111827; }
-.kpi-icon.orange { background: #f3f4f6; } .kpi-icon.orange svg { stroke: #4b5563; }
-.kpi-icon.pink   { background: #e5e7eb; } .kpi-icon.pink   svg { stroke: #6b7280; }
-.kpi-icon.indigo { background: #d1d5db; } .kpi-icon.indigo svg { stroke: #000000; }
+.kpi-icon.blue   { background: #eff6ff; } .kpi-icon.blue   svg { stroke: #2563eb; }
+.kpi-icon.green  { background: #f0fdf4; } .kpi-icon.green  svg { stroke: #059669; }
+.kpi-icon.purple { background: #f5f3ff; } .kpi-icon.purple svg { stroke: #7c3aed; }
+.kpi-icon.orange { background: #fff7ed; } .kpi-icon.orange svg { stroke: #ea580c; }
+.kpi-icon.pink   { background: #fdf2f8; } .kpi-icon.pink   svg { stroke: #db2777; }
+.kpi-icon.indigo { background: #eef2ff; } .kpi-icon.indigo svg { stroke: #4f46e5; }
 .kpi-val { font-size: 22px; font-weight: 800; color: #111827; line-height: 1.1; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-lbl { font-size: 11px; color: #6b7280; }
 
@@ -144,8 +145,8 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   padding: 3px 10px; border-radius: 99px;
   font-size: 11px; font-weight: 600;
 }
-.on-track  { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
-.behind    { background: #e5e7eb; color: #374151; border: 1px solid #9ca3af; }
+.on-track  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.behind    { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .target-right { text-align: right; }
 .target-big { font-size: 26px; font-weight: 800; color: #111827; line-height: 1; }
 .target-sub { font-size: 11px; color: #6b7280; margin-top: 3px; }
@@ -185,7 +186,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   font-size: 13px; color: #374151; outline: none;
   -webkit-appearance: none; cursor: pointer; min-width: 130px;
 }
-.f-sel:focus, .f-date:focus { border-color: #111827; box-shadow: 0 0 0 3px rgba(0,0,0,.1); }
+.f-sel:focus, .f-date:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
 .btn-reset {
   padding: 8px 16px; background: #fff; border: 1px solid #d1d5db;
   border-radius: 8px; font-size: 13px; color: #374151; cursor: pointer; transition: background .15s;
@@ -199,7 +200,7 @@ main { max-width: 1800px; margin: 0 auto; padding: 24px; }
   padding: 7px 16px; border-radius: 8px; border: 1px solid #e5e7eb;
   background: #fff; color: #374151; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s;
 }
-.btn-view.active { background: #111827; color: #fff; border-color: #111827; }
+.btn-view.active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .btn-view:not(.active):hover { background: #f9fafb; }
 
 /* ── Table ── */
@@ -218,25 +219,25 @@ th {
   white-space: nowrap; cursor: pointer; user-select: none;
 }
 th svg { width: 11px; height: 11px; vertical-align: middle; margin-left: 4px; }
-th.sorted { color: #111827; }
+th.sorted { color: #2563eb; }
 td {
   padding: 13px 18px; border-bottom: 1px solid #f3f4f6;
   font-size: 13px; color: #374151; white-space: nowrap;
 }
 tr:last-child td { border-bottom: none; }
-tr.row-top td  { background: #f3f4f6; }
-tr.row-low td  { background: #e5e7eb; }
+tr.row-top td  { background: #f0fdf4; }
+tr.row-low td  { background: #fef2f2; }
 tr:not(.row-top):not(.row-low):hover td { background: #f9fafb; }
 td.cell-name   { font-weight: 700; color: #111827; }
 td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
 .shift-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
-.sM { background: #e5e7eb; color: #111827; }
-.sA { background: #e5e7eb; color: #111827; }
-.sE { background: #d1d5db; color: #374151; }
+.sM { background: #fef3c7; color: #b45309; }
+.sA { background: #eff6ff; color: #1d4ed8; }
+.sE { background: #f5f3ff; color: #6d28d9; }
 .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-.tCairo    { background: #111827; }
-.tSharm    { background: #4b5563; }
-.tHurgadah { background: #6b7280; }
+.tCairo    { background: #059669; }
+.tSharm    { background: #2563eb; }
+.tHurgadah { background: #ea580c; }
 .tbl-footer { padding: 10px 18px; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
 
 /* ── Heatmap ── */
@@ -294,8 +295,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   cursor: pointer;
 }
 .page-tab-btn.active {
-  background: #111827;
-  border-color: #111827;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
 }
 .miss-summary {
@@ -311,8 +312,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   font-size: 11px;
   font-weight: 700;
 }
-.miss-badge.warn { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
-.miss-badge.ok { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.miss-badge.warn { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.miss-badge.ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 .miss-dates { font-size: 12px; color: #6b7280; line-height: 1.5; max-width: 520px; }
 .cal-legend {
   display: flex; flex-wrap: wrap; gap: 10px 18px;
@@ -391,16 +392,16 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   font-size: 14px; font-weight: 800;
   cursor: default;
 }
-.cal-cell-sold { background: #111827; color: #fff; }
-.cal-cell-miss { background: #fff; color: #111827; border: 2px solid #111827; }
-.cal-cell-off { background: #e5e7eb; color: #374151; font-size: 10px; }
-.cal-cell-al { background: #d1d5db; color: #111827; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-ph { background: #9ca3af; color: #fff; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-sl { background: #6b7280; color: #fff; font-size: 9px; letter-spacing: -0.5px; }
-.cal-cell-other { background: #f3f4f6; color: #4b5563; font-size: 10px; border: 1px solid #d1d5db; }
+.cal-cell-sold { background: #dcfce7; color: #15803d; }
+.cal-cell-miss { background: #fef2f2; color: #dc2626; }
+.cal-cell-off { background: #fef9c3; color: #a16207; font-size: 10px; }
+.cal-cell-al { background: #dbeafe; color: #1d4ed8; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-ph { background: #e0e7ff; color: #4338ca; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-sl { background: #fce7f3; color: #be185d; font-size: 9px; letter-spacing: -0.5px; }
+.cal-cell-other { background: #f3e8ff; color: #7c3aed; font-size: 10px; }
 .cal-cell-future { background: #f9fafb; color: #d1d5db; font-size: 12px; font-weight: 500; }
 .cal-day-th.future-day .cal-day-num { color: #9ca3af; }
-.cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #111827; }
+.cal-row-gap td.cal-sticky-ba { box-shadow: inset 3px 0 0 #dc2626; }
 </style>
 </head>
 <body>
@@ -775,7 +776,8 @@ const TARGETS = {
     Hurgadah: { type: "team_total", value: 40000 },
   },
 };
-const TEAM_COLORS = { Cairo: '#111827', Sharm: '#4b5563', Hurgadah: '#6b7280' };
+const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
+const SHOP_CHART_COLORS = ['#2563eb', '#059669', '#ea580c', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5'];
 
 let allEntries = [];
 let attendanceEntries = [];
@@ -1432,9 +1434,9 @@ function renderTargets(entries) {
       ? (dailyNeed <= 0 ? true : (avg7Sales !== null ? avg7Sales >= dailyNeed : true))
       : true;
 
-    const barGrad = pct >= 95 ? 'linear-gradient(90deg,#111827,#374151)'
-                  : pct >= 75 ? 'linear-gradient(90deg,#374151,#6b7280)'
-                  :             'linear-gradient(90deg,#9ca3af,#d1d5db)';
+    const barGrad = pct >= 95 ? 'linear-gradient(90deg,#059669,#10b981)'
+                  : pct >= 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)'
+                  :             'linear-gradient(90deg,#f59e0b,#ef4444)';
     const c = TEAM_COLORS[team];
 
     return { team, html: `<div class="target-card">
@@ -1454,7 +1456,7 @@ function renderTargets(entries) {
       <div class="target-stats">
         <div><div class="ts-lbl">Remaining</div><div class="ts-val">${rem !== null ? '$'+(rem/1000).toFixed(1)+'k' : '—'}</div></div>
         <div><div class="ts-lbl">Daily needed</div><div class="ts-val">${dailyNeed > 0 ? '$'+(dailyNeed/1000).toFixed(1)+'k' : '—'}</div></div>
-        <div><div class="ts-lbl">Last 7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#111827':'#6b7280'}">${avg7Qty === null ? '—' : (avg7Qty.toFixed(1) + ' pcs')}</div></div>
+        <div><div class="ts-lbl">Last 7-day avg qty/day</div><div class="ts-val" style="color:${onTrack?'#059669':'#dc2626'}">${avg7Qty === null ? '—' : (avg7Qty.toFixed(1) + ' pcs')}</div></div>
       </div>
     </div>`,
       pct,
@@ -1685,8 +1687,8 @@ function renderCharts(entries) {
   const sorted = Object.entries(byBA).sort((a, b) => b[1] - a[1]).slice(0, 14);
   const bN = sorted.map(([n]) => n);
   const bV = sorted.map(([, v]) => v);
-  const bC = sorted.map((_, i) => `rgba(17,24,39,${Math.max(0.35, 1 - i * 0.055)})`);
-  if (sorted.length) bC[0] = '#111827';
+  const bC = sorted.map((_, i) => `rgba(37,99,235,${Math.max(0.35, 1 - i * 0.055)})`);
+  if (sorted.length) bC[0] = '#2563eb';
 
   Plotly.react('chart-ba', [{ type: 'bar', x: bN, y: bV, marker: { color: bC, line: { width: 0 } },
     hovertemplate: '<b>%{x}</b><br>%{y} PCs<extra></extra>' }], {
@@ -1755,9 +1757,7 @@ function shopFilterSubtitle() {
 }
 
 function shopPieColors(n) {
-  return Array.from({ length: n }, (_, i) =>
-    `rgba(17,24,39,${Math.max(0.35, 1 - i * (0.65 / Math.max(n - 1, 1)))})`
-  );
+  return Array.from({ length: n }, (_, i) => SHOP_CHART_COLORS[i % SHOP_CHART_COLORS.length]);
 }
 
 function plotlyResizeShopCharts() {
@@ -1830,7 +1830,6 @@ function renderShopAnalytics(entries) {
   const totalPcs = rows.reduce((s, r) => s + r.pcs, 0);
   const labels = rows.map(r => r.store);
   const colors = shopPieColors(labels.length);
-  if (colors.length) colors[0] = '#111827';
 
   const pieLayout = {
     ...layoutBase,
@@ -2656,8 +2655,8 @@ function renderHeatmap(entries) {
   if (!baList.length) { document.getElementById('hmap-body').innerHTML='<p style="color:#9ca3af;padding:20px">No data</p>'; return; }
   const all = baList.flatMap(b => DAYS.map(d => baMap[b][d]));
   const max = Math.max(...all)||1;
-  const gc = v => !v?'#f3f4f6': v/max>.75?'#111827': v/max>.5?'#374151': v/max>.25?'#9ca3af':'#e5e7eb';
-  const tc = v => !v?'#9ca3af':'#111827';
+  const gc = v => !v?'#f3f4f6': v/max>.75?'#059669': v/max>.5?'#10b981': v/max>.25?'#6ee7b7':'#d1fae5';
+  const tc = v => !v?'#9ca3af':'#065f46';
   document.getElementById('hmap-body').innerHTML = `
     <table class="hmap">
       <thead><tr><th style="text-align:left;min-width:120px">BA</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead>

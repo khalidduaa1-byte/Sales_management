@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
-<meta name="theme-color" content="#000000"/>
+<meta name="theme-color" content="#2563eb"/>
 <meta name="description" content="BA sales logging — Dolce &amp; Gabbana"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -32,13 +32,13 @@
   --bg: #f4f6f9;
   --card: #ffffff;
   --border: #e2e8f0;
-  --accent: #111827;
-  --accent-hover: #000000;
-  --focus-ring: rgba(0, 0, 0, 0.12);
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --focus-ring: rgba(37, 99, 235, 0.12);
   --text: #1e293b;
   --muted: #64748b;
-  --red: #374151;
-  --green: #111827;
+  --red: #dc2626;
+  --green: #16a34a;
   --radius: 16px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -166,8 +166,8 @@ input::placeholder { color: #94a3b8; }
   font-size: 13px;
   display: none;
 }
-.msg.error   { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
-.msg.success { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
+.msg.error   { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
 
 .install-hint {
   margin-top: 14px;
@@ -184,7 +184,7 @@ input::placeholder { color: #94a3b8; }
 #pwa-install-banner { display: none; text-align: center; }
 .btn-install {
   width: 100%;
-  background: #111827;
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -194,7 +194,7 @@ input::placeholder { color: #94a3b8; }
   cursor: pointer;
   margin-bottom: 8px;
 }
-.btn-install:hover { background: #000000; }
+.btn-install:hover { background: var(--accent-hover); }
 
 /* Register-only fields */
 #register-fields { display: none; }
@@ -257,8 +257,8 @@ input::placeholder { color: #94a3b8; }
   <div id="recovery-panel" class="card" style="box-shadow:none;padding:0;border:none">
     <h2>Set new password</h2>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.45">
-      You opened a password-reset email link. Only use this if you need a <em>new</em> password.
-      If your manager already set your password, go back to Sign In.
+      You opened a password-reset email link. Type a new password below, then tap <strong>Save &amp; sign in</strong>.
+      If your manager already gave you a password, tap <strong>Back to Sign In</strong> — do not use this screen.
     </p>
     <label>New password</label>
     <input type="password" id="recovery-password" placeholder="At least 6 characters" minlength="6"/>
@@ -326,7 +326,7 @@ function isPasswordRecoveryUrl() {
   const { hash, query } = authParamsFromUrl();
   if (hash.get('type') === 'recovery' || query.get('type') === 'recovery') return true;
   if ((window.location.hash || '').includes('type=recovery')) return true;
-  return sessionStorage.getItem('ba_password_recovery') === '1';
+  return false;
 }
 
 function markPasswordRecoveryMode() {
@@ -370,6 +370,7 @@ async function showSignInPanel() {
 
 // ── Show error when bounced back from ba.html / manager.html ─────
 const urlParams = new URLSearchParams(window.location.search);
+const forceSignIn = urlParams.get('signin') === '1';
 const urlError = urlParams.get('error');
 const urlDetail = urlParams.get('detail');
 if (urlError) {
@@ -387,11 +388,20 @@ sb.auth.onAuthStateChange((event) => {
   if (event === 'PASSWORD_RECOVERY') showRecoveryWaitingMessage();
 });
 
-if (isPasswordRecoveryUrl()) showRecoveryWaitingMessage();
+if (!forceSignIn && isPasswordRecoveryUrl()) showRecoveryWaitingMessage();
 document.getElementById('forgot-wrap').style.display = 'block';
 
 // ── Session bootstrap (after Supabase reads hash / ?code= from email link) ──
 (async () => {
+  if (forceSignIn) {
+    clearPasswordRecoveryMode();
+    window.history.replaceState({}, '', window.location.pathname || '/');
+    document.getElementById('recovery-panel').style.display = 'none';
+    document.getElementById('auth-form').style.display = 'block';
+    const tabs = document.querySelector('.tabs');
+    if (tabs) tabs.style.display = 'grid';
+    return;
+  }
   if (urlError) return;
 
   const { query } = authParamsFromUrl();
@@ -403,7 +413,16 @@ document.getElementById('forgot-wrap').style.display = 'block';
       // PKCE reset links often have ?code= only; event may be PASSWORD_RECOVERY or SIGNED_IN
       if (!passwordRecoveryMode) showRecoveryWaitingMessage();
     } catch (e) {
-      showMsg(e.message || 'Reset link expired. Use Forgot password again.', 'error');
+      clearPasswordRecoveryMode();
+      document.getElementById('recovery-panel').style.display = 'none';
+      document.getElementById('auth-form').style.display = 'block';
+      const tabs = document.querySelector('.tabs');
+      if (tabs) tabs.style.display = 'grid';
+      showMsg(
+        (e.message || 'Reset link expired or already used.') +
+          ' Ask your manager for the app link with ?signin=1 or use Forgot password.',
+        'error'
+      );
     }
   }
 
@@ -583,7 +602,7 @@ async function handleSubmit(e) {
   e.preventDefault();  // Stop the page from refreshing (default form behaviour)
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Please wait…';
+  btn.textContent = 'Signing in…';
   clearMsg();
 
   const email    = document.getElementById('email').value.trim();
@@ -593,6 +612,7 @@ async function handleSubmit(e) {
     if (mode === 'login') {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      clearPasswordRecoveryMode();
       // Wait until JWT is on the client before reading profiles (avoids false "missing profile").
       const { data: { user }, error: userErr } = await sb.auth.getUser();
       if (userErr || !user) throw userErr || new Error('Sign-in succeeded but session was not ready. Try again.');

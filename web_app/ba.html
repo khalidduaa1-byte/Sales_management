@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
-<meta name="theme-color" content="#000000"/>
+<meta name="theme-color" content="#2563eb"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
@@ -20,12 +20,12 @@
   --card: #ffffff;
   --card2: #f8fafc;
   --border: #e2e8f0;
-  --accent: #111827;
-  --accent-hover: #000000;
-  --focus-ring: rgba(0, 0, 0, 0.12);
-  --green: #111827;
-  --orange: #4b5563;
-  --red: #374151;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --focus-ring: rgba(37, 99, 235, 0.12);
+  --green: #16a34a;
+  --orange: #d97706;
+  --red: #dc2626;
   --text: #1e293b;
   --muted: #64748b;
   --radius: 16px;
@@ -80,11 +80,11 @@ body {
   padding: 14px 16px 0;
 }
 .target-card {
-  background: linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%);
-  border: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
   border-radius: 14px;
   padding: 14px 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
 }
 .ba-greeting {
   font-size: 14px;
@@ -94,20 +94,20 @@ body {
   padding-bottom: 10px;
   border-bottom: 1px solid #e5e7eb;
 }
-.ba-greeting strong { font-weight: 700; color: #111827; }
+.ba-greeting strong { font-weight: 700; color: #1e40af; }
 .target-card.target-on .target-bar-fill {
-  background: linear-gradient(90deg, #111827, #374151);
+  background: linear-gradient(90deg, #059669, #10b981);
 }
 .target-card.target-close .target-bar-fill {
-  background: linear-gradient(90deg, #374151, #6b7280);
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
 }
 .target-card.target-push .target-bar-fill {
-  background: linear-gradient(90deg, #9ca3af, #6b7280);
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
 }
 .target-card h3 {
   font-size: 12px;
   font-weight: 700;
-  color: #111827;
+  color: #1e40af;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 8px;
@@ -140,7 +140,7 @@ body {
 .target-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #111827, #6b7280);
+  background: linear-gradient(90deg, #2563eb, #16a34a);
   transition: width 0.35s ease;
   width: 0%;
 }
@@ -270,8 +270,8 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   margin-bottom: 16px;
   display: none;
 }
-.msg.error   { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
-.msg.success { background: #e5e7eb; color: #111827; border: 1px solid #9ca3af; }
+.msg.error   { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+.msg.success { background: #f0fdf4; color: var(--green); border: 1px solid #bbf7d0; }
 
 /* ── History ── */
 .history-card {
@@ -305,16 +305,16 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 .entry-items  { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .entry-delete {
   margin-top: 8px;
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  color: #111827;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
   border-radius: 8px;
   font-size: 11px;
   font-weight: 700;
   padding: 5px 8px;
   cursor: pointer;
 }
-.entry-delete:hover { background: #e5e7eb; }
+.entry-delete:hover { background: #fee2e2; }
 .shift-tag {
   display: inline-block;
   padding: 2px 8px;
@@ -323,9 +323,9 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   font-weight: 700;
   margin-top: 4px;
 }
-.shift-Morning   { background: #f3f4f6; color: #111827; }
-.shift-Afternoon { background: #e5e7eb; color: #111827; }
-.shift-Evening   { background: #d1d5db; color: #111827; }
+.shift-Morning   { background: #fef3c7; color: #b45309; }
+.shift-Afternoon { background: #eff6ff; color: #1d4ed8; }
+.shift-Evening   { background: #f5f3ff; color: #6d28d9; }
 .empty-state { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
 </style>
 </head>
