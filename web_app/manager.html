@@ -710,17 +710,17 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
   <p class="shop-section" id="shop-filter-note" style="display:none;font-size:12px;color:#6b7280;margin:-6px 0 14px"></p>
   <div class="charts-row charts-row-2eq shop-section" style="display:none">
     <div class="chart-card">
-      <div class="chart-title">Sales share by shop</div>
+      <div class="chart-title" id="shop-sales-pie-title">Sales share by city</div>
       <div id="chart-shop-sales-pie" style="height:300px"></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">PCs share by shop</div>
+      <div class="chart-title" id="shop-pcs-pie-title">PCs share by city</div>
       <div id="chart-shop-pcs-pie" style="height:300px"></div>
     </div>
   </div>
   <div class="charts-row charts-row-full shop-section" style="display:none">
     <div class="chart-card">
-      <div class="chart-title">Sales by shop (ranked)</div>
+      <div class="chart-title" id="shop-sales-bar-title">Sales by sub-shop (all cities, ranked)</div>
       <div id="chart-shop-sales-bar" style="height:max(260px,auto);min-height:260px"></div>
     </div>
   </div>
@@ -729,7 +729,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <table>
         <thead><tr>
           <th>Shop</th>
-          <th>Team</th>
+          <th>City</th>
           <th>Sales ($)</th>
           <th>PCs</th>
           <th>% Sales</th>
@@ -811,6 +811,16 @@ function canonicalTeamName(team) {
 
 const MANAGER_CITY_FILTERS = ['Cairo', 'Sharm', 'Hurgadah'];
 
+// Canonical sub-shops per city. Used for the Shops tab and for normalising the
+// mix of legacy Excel rows (store=city) with BA-app rows (store=specific sub-shop).
+const SHOPS_BY_CITY = {
+  Cairo:    ['Terminal 1', 'Terminal 2', 'Terminal 3', 'Seasonal Terminal'],
+  Sharm:    ['Sharm Sheikh'],
+  Hurgadah: ['Russian shop', 'European shop'],
+};
+
+const CITY_COLORS = { Cairo: '#2563eb', Sharm: '#059669', Hurgadah: '#ea580c' };
+
 /** Manager dashboard city filter — groups T1/T2/T3 → Cairo, Hurghada shops → Hurgadah. */
 function storeToManagerCity(store, team) {
   const t = canonicalTeamName(team);
@@ -822,6 +832,31 @@ function storeToManagerCity(store, team) {
   if (s.includes('hurgh') || s.includes('hurgad')) return 'Hurgadah';
   const fromStore = canonicalTeamName(store);
   return MANAGER_CITY_FILTERS.includes(fromStore) ? fromStore : '';
+}
+
+/**
+ * Maps a raw `store` value to a canonical sub-shop within its city.
+ * Legacy Excel imports use store=city (Cairo/Sharm/Hurgadah) — those map to
+ * "(unspecified)" so they're countable but visibly distinct from BA-app entries.
+ * Returns { city, subShop } or { city: '', subShop: '(unspecified)' } if we can't classify.
+ */
+function normalizeStore(store, team) {
+  const city = storeToManagerCity(store, team);
+  const raw = String(store || '').trim();
+  const s = raw.toLowerCase();
+
+  if (/terminal\s*1/.test(s)) return { city: 'Cairo', subShop: 'Terminal 1' };
+  if (/terminal\s*2/.test(s)) return { city: 'Cairo', subShop: 'Terminal 2' };
+  if (/terminal\s*3/.test(s)) return { city: 'Cairo', subShop: 'Terminal 3' };
+  if (/seasonal/.test(s))     return { city: 'Cairo', subShop: 'Seasonal Terminal' };
+  if (/russian/.test(s))      return { city: 'Hurgadah', subShop: 'Russian shop' };
+  if (/european/.test(s))     return { city: 'Hurgadah', subShop: 'European shop' };
+  if (/sharm/.test(s))        return { city: 'Sharm', subShop: 'Sharm Sheikh' };
+
+  // Legacy: store value is just the city (Cairo / Sharm / Hurgadah). Mark unspecified.
+  if (city) return { city, subShop: `${city} (unspecified)` };
+
+  return { city: '', subShop: raw || '(unspecified)' };
 }
 
 function getManagerCityFilter() {
@@ -1723,27 +1758,34 @@ function renderCharts(entries) {
 }
 
 // ── Shop analytics ───────────────────────────────────────────────
-function aggregateByStore(entries) {
-  const byStore = {};
+/** Normalises every entry into { city, subShop } and groups by sub-shop. */
+function aggregateBySubShop(entries) {
+  const byShop = {};
   entries.forEach(e => {
-    const store = String(e.store || '').trim() || 'Unspecified';
-    if (!byStore[store]) {
-      byStore[store] = { store, sales: 0, pcs: 0, rows: 0, teams: {} };
+    const { city, subShop } = normalizeStore(e.store, e.team);
+    const key = `${city}|${subShop}`;
+    if (!byShop[key]) {
+      byShop[key] = { city, subShop, sales: 0, pcs: 0, rows: 0 };
     }
-    const r = byStore[store];
-    r.sales += Number(e.sales_amount) || 0;
-    r.pcs += Number(e.items_sold) || 0;
-    r.rows += 1;
-    const team = e.team || '';
-    if (team) r.teams[team] = (r.teams[team] || 0) + 1;
+    byShop[key].sales += Number(e.sales_amount) || 0;
+    byShop[key].pcs += Number(e.items_sold) || 0;
+    byShop[key].rows += 1;
   });
-  return Object.values(byStore).map(r => {
-    const ranked = Object.entries(r.teams).sort((a, b) => b[1] - a[1]);
-    let team = '—';
-    if (ranked.length === 1) team = ranked[0][0];
-    else if (ranked.length > 1) team = 'Mixed';
-    return { store: r.store, team, sales: r.sales, pcs: r.pcs, rows: r.rows };
-  }).sort((a, b) => b.sales - a.sales);
+  return Object.values(byShop).sort((a, b) => b.sales - a.sales);
+}
+
+/** Rolls sub-shop data up to city level. */
+function aggregateByCity(entries) {
+  const byCity = {};
+  entries.forEach(e => {
+    const { city } = normalizeStore(e.store, e.team);
+    const key = city || '(unclassified)';
+    if (!byCity[key]) byCity[key] = { city: key, sales: 0, pcs: 0, rows: 0 };
+    byCity[key].sales += Number(e.sales_amount) || 0;
+    byCity[key].pcs += Number(e.items_sold) || 0;
+    byCity[key].rows += 1;
+  });
+  return Object.values(byCity).sort((a, b) => b.sales - a.sales);
 }
 
 function shopFilterSubtitle() {
@@ -1775,15 +1817,27 @@ function refreshShopCharts() {
 
 function renderShopAnalytics(entries) {
   const monthKey = getGlobalMonthRaw() || getSelectedMonth();
+  const cityFilter = getManagerCityFilter();
+  const groupByCity = !cityFilter; // No city picked → pie shows cities; city picked → pie shows that city's sub-shops
+
   const monthLbl = document.getElementById('shop-month-lbl');
   const noteEl = document.getElementById('shop-filter-note');
   const tbody = document.getElementById('shop-tbl-body');
   const footer = document.getElementById('shop-tbl-footer');
+  const salesPieTitle = document.getElementById('shop-sales-pie-title');
+  const pcsPieTitle = document.getElementById('shop-pcs-pie-title');
+  const barTitle = document.getElementById('shop-sales-bar-title');
+
   if (monthLbl) monthLbl.textContent = monthLabel(monthKey);
   if (noteEl) {
-    const cityHint = getManagerCityFilter() ? '' : ' Pick a city above for a clearer pie chart.';
-    noteEl.textContent = `Filters: ${shopFilterSubtitle()}.${cityHint} Share = portion of filtered month (not shop targets).`;
+    const guidance = groupByCity
+      ? 'Showing all three cities. Pick a city above to drill into its sub-shops.'
+      : `Showing sub-shops within ${cityFilter}. Clear the city filter to compare cities.`;
+    noteEl.textContent = `Filters: ${shopFilterSubtitle()}. ${guidance}`;
   }
+  if (salesPieTitle) salesPieTitle.textContent = groupByCity ? 'Sales share by city' : `Sales share by shop — ${cityFilter}`;
+  if (pcsPieTitle)   pcsPieTitle.textContent   = groupByCity ? 'PCs share by city'   : `PCs share by shop — ${cityFilter}`;
+  if (barTitle)      barTitle.textContent      = groupByCity ? 'Sales by sub-shop (all cities, ranked)' : `Sales by sub-shop in ${cityFilter} (ranked)`;
 
   const layoutBase = {
     paper_bgcolor: 'transparent',
@@ -1795,105 +1849,121 @@ function renderShopAnalytics(entries) {
   };
   const layoutEmpty = {
     ...layoutBase,
-    annotations: [{
-      text: 'No data for current filters',
-      xref: 'paper',
-      yref: 'paper',
-      x: 0.5,
-      y: 0.5,
-      showarrow: false,
-      font: { size: 13, color: '#9ca3af' },
-    }],
+    annotations: [{ text: 'No data for current filters', xref: 'paper', yref: 'paper', x: 0.5, y: 0.5, showarrow: false, font: { size: 13, color: '#9ca3af' } }],
   };
   const plotOpts = { responsive: true, displayModeBar: false };
-
   if (!window.Plotly) return;
 
-  const rows = aggregateByStore(entries);
-  if (!rows.length) {
+  // City pie data (always shown when no city filter)
+  const cityRows = aggregateByCity(entries);
+  // Sub-shop data (always computed; used for table + bar; also for pie when city is filtered)
+  const subRows = aggregateBySubShop(entries);
+  // Bar chart shows sub-shops; restrict to selected city when filtered
+  const subRowsForBar = cityFilter ? subRows.filter(r => r.city === cityFilter) : subRows;
+
+  const allEmpty = !cityRows.length && !subRows.length;
+  if (allEmpty) {
     Plotly.react('chart-shop-sales-pie', [{ type: 'pie', labels: [], values: [] }], layoutEmpty, plotOpts);
     Plotly.react('chart-shop-pcs-pie', [{ type: 'pie', labels: [], values: [] }], layoutEmpty, plotOpts);
-    Plotly.react('chart-shop-sales-bar', [{ type: 'bar', x: [], y: [] }], {
-      ...layoutBase,
-      margin: { t: 10, b: 40, l: 120, r: 20 },
-      xaxis: { visible: false },
-      yaxis: { visible: false },
-    }, plotOpts);
-    if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
-    }
+    Plotly.react('chart-shop-sales-bar', [{ type: 'bar', x: [], y: [] }], { ...layoutBase, margin: { t: 10, b: 40, l: 120, r: 20 }, xaxis: { visible: false }, yaxis: { visible: false } }, plotOpts);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
     if (footer) footer.textContent = '';
     return;
   }
 
-  const totalSales = rows.reduce((s, r) => s + r.sales, 0);
-  const totalPcs = rows.reduce((s, r) => s + r.pcs, 0);
-  const labels = rows.map(r => r.store);
-  const colors = shopPieColors(labels.length);
+  // Pies
+  const pieLayout = { ...layoutBase, margin: { t: 10, b: 60, l: 10, r: 10 } };
+  if (groupByCity) {
+    const labels = cityRows.map(r => r.city);
+    const colors = labels.map(l => CITY_COLORS[l] || '#9ca3af');
+    Plotly.react('chart-shop-sales-pie', [{
+      type: 'pie', labels, values: cityRows.map(r => r.sales),
+      hole: 0.45, textinfo: 'percent', textposition: 'inside', marker: { colors },
+      hovertemplate: '<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>',
+    }], pieLayout, plotOpts);
+    Plotly.react('chart-shop-pcs-pie', [{
+      type: 'pie', labels, values: cityRows.map(r => r.pcs),
+      hole: 0.45, textinfo: 'percent', textposition: 'inside', marker: { colors },
+      hovertemplate: '<b>%{label}</b><br>%{value} PCs<br>%{percent}<extra></extra>',
+    }], pieLayout, plotOpts);
+  } else {
+    const filteredSubs = subRows.filter(r => r.city === cityFilter);
+    const labels = filteredSubs.map(r => r.subShop);
+    const colors = shopPieColors(labels.length);
+    Plotly.react('chart-shop-sales-pie', [{
+      type: 'pie', labels, values: filteredSubs.map(r => r.sales),
+      hole: 0.45, textinfo: 'percent', textposition: 'inside', marker: { colors },
+      hovertemplate: '<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>',
+    }], pieLayout, plotOpts);
+    Plotly.react('chart-shop-pcs-pie', [{
+      type: 'pie', labels, values: filteredSubs.map(r => r.pcs),
+      hole: 0.45, textinfo: 'percent', textposition: 'inside', marker: { colors },
+      hovertemplate: '<b>%{label}</b><br>%{value} PCs<br>%{percent}<extra></extra>',
+    }], pieLayout, plotOpts);
+  }
 
-  const pieLayout = {
-    ...layoutBase,
-    margin: { t: 10, b: 60, l: 10, r: 10 },
-  };
-
-  Plotly.react('chart-shop-sales-pie', [{
-    type: 'pie',
-    labels,
-    values: rows.map(r => r.sales),
-    hole: 0.45,
-    textinfo: 'percent',
-    textposition: 'inside',
-    marker: { colors },
-    hovertemplate: '<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>',
-  }], pieLayout, plotOpts);
-
-  Plotly.react('chart-shop-pcs-pie', [{
-    type: 'pie',
-    labels,
-    values: rows.map(r => r.pcs),
-    hole: 0.45,
-    textinfo: 'percent',
-    textposition: 'inside',
-    marker: { colors },
-    hovertemplate: '<b>%{label}</b><br>%{value} PCs<br>%{percent}<extra></extra>',
-  }], pieLayout, plotOpts);
-
-  const barH = Math.max(260, rows.length * 36);
+  // Bar chart — always sub-shops, coloured by city
+  const barLabels = subRowsForBar.map(r => groupByCity ? `${r.subShop} (${r.city})` : r.subShop);
+  const barColors = subRowsForBar.map(r => CITY_COLORS[r.city] || '#9ca3af');
+  const barH = Math.max(260, subRowsForBar.length * 36);
   const barEl = document.getElementById('chart-shop-sales-bar');
   if (barEl) barEl.style.height = barH + 'px';
 
   Plotly.react('chart-shop-sales-bar', [{
-    type: 'bar',
-    orientation: 'h',
-    y: labels.slice().reverse(),
-    x: rows.map(r => r.sales).reverse(),
-    marker: { color: colors.slice().reverse(), line: { width: 0 } },
+    type: 'bar', orientation: 'h',
+    y: barLabels.slice().reverse(),
+    x: subRowsForBar.map(r => r.sales).reverse(),
+    marker: { color: barColors.slice().reverse(), line: { width: 0 } },
     hovertemplate: '<b>%{y}</b><br>$%{x:,.0f}<extra></extra>',
   }], {
-    ...layoutBase,
-    showlegend: false,
-    margin: { t: 10, b: 40, l: Math.min(220, Math.max(120, labels.reduce((m, s) => Math.max(m, s.length), 0) * 7)), r: 24 },
+    ...layoutBase, showlegend: false,
+    margin: { t: 10, b: 40, l: Math.min(240, Math.max(140, barLabels.reduce((m, s) => Math.max(m, s.length), 0) * 7)), r: 24 },
     xaxis: { tickfont: { size: 11, color: '#6b7280' }, gridcolor: '#f3f4f6' },
     yaxis: { automargin: true, tickfont: { size: 11, color: '#374151' } },
   }, plotOpts);
 
+  // Table: sub-shops grouped under city subtotal rows
+  const totalSales = subRows.reduce((s, r) => s + r.sales, 0);
+  const totalPcs = subRows.reduce((s, r) => s + r.pcs, 0);
+  const cityOrder = cityRows.map(r => r.city);
+
   if (tbody) {
-    tbody.innerHTML = rows.map(r => {
-      const pctSales = totalSales ? (r.sales / totalSales) * 100 : 0;
-      const pctPcs = totalPcs ? (r.pcs / totalPcs) * 100 : 0;
-      return `<tr>
-        <td class="cell-name">${r.store}</td>
-        <td>${r.team}</td>
-        <td class="cell-amount">$${fmt(r.sales)}</td>
-        <td>${r.pcs}</td>
-        <td>${pctSales.toFixed(1)}%</td>
-        <td>${pctPcs.toFixed(1)}%</td>
-        <td>${r.rows}</td>
-      </tr>`;
-    }).join('');
+    const html = [];
+    cityOrder.forEach(city => {
+      const cityRow = cityRows.find(r => r.city === city);
+      const subsHere = subRows.filter(r => r.city === city);
+      if (!subsHere.length) return;
+      const cityPctSales = totalSales ? (cityRow.sales / totalSales) * 100 : 0;
+      const cityPctPcs = totalPcs ? (cityRow.pcs / totalPcs) * 100 : 0;
+      html.push(`<tr style="background:#f9fafb;font-weight:700">
+        <td class="cell-name">${city} — total</td>
+        <td>—</td>
+        <td class="cell-amount">$${fmt(cityRow.sales)}</td>
+        <td>${cityRow.pcs}</td>
+        <td>${cityPctSales.toFixed(1)}%</td>
+        <td>${cityPctPcs.toFixed(1)}%</td>
+        <td>${cityRow.rows}</td>
+      </tr>`);
+      subsHere.forEach(r => {
+        const pctSales = totalSales ? (r.sales / totalSales) * 100 : 0;
+        const pctPcs = totalPcs ? (r.pcs / totalPcs) * 100 : 0;
+        html.push(`<tr>
+          <td class="cell-name" style="padding-left:24px;color:#4b5563">${r.subShop}</td>
+          <td>${r.city}</td>
+          <td class="cell-amount">$${fmt(r.sales)}</td>
+          <td>${r.pcs}</td>
+          <td>${pctSales.toFixed(1)}%</td>
+          <td>${pctPcs.toFixed(1)}%</td>
+          <td>${r.rows}</td>
+        </tr>`);
+      });
+    });
+    tbody.innerHTML = html.join('') || '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No records for selected filters</td></tr>';
   }
   if (footer) {
-    footer.textContent = `${rows.length} shop${rows.length !== 1 ? 's' : ''} · $${fmt(totalSales)} sales · ${totalPcs} PCs`;
+    const nCities = cityRows.length;
+    const nShops = subRows.length;
+    footer.textContent = `${nCities} ${nCities === 1 ? 'city' : 'cities'} · ${nShops} sub-shop${nShops === 1 ? '' : 's'} · $${fmt(totalSales)} sales · ${totalPcs} PCs`;
   }
 }
 
