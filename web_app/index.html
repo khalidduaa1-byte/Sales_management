@@ -296,12 +296,30 @@ input::placeholder { color: #94a3b8; }
 // Password-reset links must land on the live app (not localhost). Dashboard resets use Site URL in Supabase too.
 const LIVE_APP_URL = 'https://sales-management-phi-blue.vercel.app';
 
+// Storage that prefers localStorage but falls back to memory when blocked
+// (Safari Private Mode, WhatsApp/Instagram in-app browsers, locked-down iOS).
+// Without this fallback, the Supabase client throws on construction in those
+// contexts and the login page never finishes loading.
+function makeSafeAuthStorage() {
+  const mem = Object.create(null);
+  function tryStorage(fn) { try { return fn(window.localStorage); } catch (_) { return undefined; } }
+  return {
+    getItem(k) {
+      const v = tryStorage(s => s.getItem(k));
+      return v != null ? v : (k in mem ? mem[k] : null);
+    },
+    setItem(k, v) { tryStorage(s => s.setItem(k, v)); mem[k] = v; },
+    removeItem(k) { tryStorage(s => s.removeItem(k)); delete mem[k]; },
+  };
+}
+
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
   {
     auth: {
+      storage: makeSafeAuthStorage(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
@@ -334,14 +352,23 @@ function isPasswordRecoveryUrl() {
   return false;
 }
 
+// In-app browsers (WhatsApp/Instagram) and Safari private mode throw on
+// sessionStorage access. Wrap so the recovery flag is best-effort.
+function safeSessionWrite(key, value) {
+  try { window.sessionStorage.setItem(key, value); } catch (_) { /* storage blocked */ }
+}
+function safeSessionRemove(key) {
+  try { window.sessionStorage.removeItem(key); } catch (_) { /* storage blocked */ }
+}
+
 function markPasswordRecoveryMode() {
   passwordRecoveryMode = true;
-  sessionStorage.setItem('ba_password_recovery', '1');
+  safeSessionWrite('ba_password_recovery', '1');
 }
 
 function clearPasswordRecoveryMode() {
   passwordRecoveryMode = false;
-  sessionStorage.removeItem('ba_password_recovery');
+  safeSessionRemove('ba_password_recovery');
 }
 
 function showPasswordRecoveryPanel() {

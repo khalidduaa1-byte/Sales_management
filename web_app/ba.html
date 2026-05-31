@@ -443,12 +443,27 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 </div>
 
 <script>
+// Storage adapter that survives blocked localStorage (Safari Private Mode,
+// WhatsApp/Instagram in-app browsers). Without it, sb construction throws.
+function makeSafeAuthStorage() {
+  const mem = Object.create(null);
+  function tryStorage(fn) { try { return fn(window.localStorage); } catch (_) { return undefined; } }
+  return {
+    getItem(k) {
+      const v = tryStorage(s => s.getItem(k));
+      return v != null ? v : (k in mem ? mem[k] : null);
+    },
+    setItem(k, v) { tryStorage(s => s.setItem(k, v)); mem[k] = v; },
+    removeItem(k) { tryStorage(s => s.removeItem(k)); delete mem[k]; },
+  };
+}
+
 const { createClient } = supabase;
 const sb = createClient(
   'https://tnxkstouapfcjoboymnf.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRueGtzdG91YXBmY2pvYm95bW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NjE5NzgsImV4cCI6MjA5MjUzNzk3OH0.wuzHb3otLoCMCN26fvJvzN3S0cw4Z7gHv6gdnXRnBKQ',
   {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: { storage: makeSafeAuthStorage(), persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     global: {
       fetch: (url, options = {}) =>
         fetch(url, { ...options, cache: 'no-store' }),
