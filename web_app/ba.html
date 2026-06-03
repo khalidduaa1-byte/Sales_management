@@ -539,11 +539,20 @@ const SHOPS_BY_TEAM = {
   Hurgadah: ['Hurghada russian shop', 'Hurghada European shop'],
 };
 
+// Temporary HPP animation spot inside Terminal 3 (Cairo), running 1–10 June 2026.
+// Cairo BAs log its sales separately from regular Terminal 3. Shown through a
+// short entry buffer (13 June) then auto-hidden — remove this block afterwards.
+const HPP_CAIRO_SHOP = 'Terminal 3 — HPP (animation)';
+const HPP_VISIBLE_UNTIL = '2026-06-13';
+
 function populateShopOptions() {
   const sel = document.getElementById('entry-store');
   if (!sel) return;
   const team = currentProfile ? canonicalTeamName(currentProfile.team) : '';
-  const shops = SHOPS_BY_TEAM[team] || Object.values(SHOPS_BY_TEAM).flat();
+  let shops = SHOPS_BY_TEAM[team] || Object.values(SHOPS_BY_TEAM).flat();
+  if (team === 'Cairo' && new Date().toLocaleDateString('en-CA') <= HPP_VISIBLE_UNTIL) {
+    shops = [...shops, HPP_CAIRO_SHOP];
+  }
   const prev = sel.value;
   sel.innerHTML = '<option value="">Select shop</option>' +
     shops.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -682,17 +691,13 @@ async function computePersonalMonthlyTarget(monthKey, teamCanon) {
 
   const type = tRow.target_type;
   const value = Number(tRow.target_value) || 0;
-  if (type === 'per_ba') {
-    return { goal: value, mode: 'per_ba', raw: tRow };
+  if (type === 'team_total') {
+    // Team-based goal: every BA on the team sees the SAME team target and the
+    // team's combined progress (commission is team-based, not per-BA). No split.
+    return { goal: value, mode: 'team_total', teamGoal: value, raw: tRow };
   }
-  const { count, error: cErr } = await sb
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('team', teamCanon)
-    .eq('role', 'ba');
-  const n = !cErr && count ? Math.max(1, count) : 1;
-  const share = value / n;
-  return { goal: share, mode: 'team_total', teamGoal: value, teamBas: n, raw: tRow };
+  // per_ba: each BA's personal goal is the target value itself.
+  return { goal: value, mode: 'per_ba', raw: tRow };
 }
 
 function baFirstName(fullName) {
@@ -788,34 +793,49 @@ async function renderTargetBanner(monthSales) {
   const monthTitle = document.getElementById('target-month-title');
   if (monthTitle) monthTitle.textContent = `Monthly target — ${formatMonthLabel(monthKey)}`;
 
-  const { goal, mode, teamGoal, teamBas } = await computePersonalMonthlyTarget(monthKey, team);
-  const mySales = sumSalesAmount(monthSales || []);
+  const { goal, mode } = await computePersonalMonthlyTarget(monthKey, team);
+  const myShare = sumSalesAmount(monthSales || []);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
     updateBaGreeting({ hasTarget: false, pct: 0, remain: 0, goal: 0 });
     pctEl.textContent = '—';
     subEl.textContent = 'No target set';
-    footEl.innerHTML = `Your sales <strong>${formatMonthLabel(monthKey)}</strong>: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
+    footEl.innerHTML = `Your sales <strong>${formatMonthLabel(monthKey)}</strong>: <strong>$${myShare.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. Ask your manager to set the monthly target for <strong>${team}</strong>.`;
     barEl.style.width = '0%';
     return;
   }
 
-  const pct = Math.min(150, (mySales / goal) * 100);
-  const remain = Math.max(0, goal - mySales);
+  // For team_total teams the bar tracks the WHOLE team's sales vs the team goal
+  // (same view for everyone — commission is team-based). RLS blocks reading
+  // peers' rows, so ask the DB for the team aggregate; fall back to own sales.
+  let progress = myShare;
+  if (mode === 'team_total') {
+    try {
+      const { data: teamTotal, error: ttErr } = await sb.rpc('get_team_month_total', { p_month_key: monthKey });
+      if (!ttErr && teamTotal != null) progress = Number(teamTotal);
+    } catch (_) { /* keep own-sales fallback */ }
+  }
+
+  const pct = Math.min(150, (progress / goal) * 100);
+  const remain = Math.max(0, goal - progress);
   updateBaGreeting({ hasTarget: true, pct, remain, goal });
 
   pctEl.textContent = `${pct.toFixed(0)}%`;
-  subEl.innerHTML =
-    `You: <strong>$${mySales.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
-    `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
 
-  if (mode === 'team_total' && teamGoal != null) {
+  if (mode === 'team_total') {
+    subEl.innerHTML =
+      `Team: <strong>$${progress.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
+      `Team goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
     footEl.innerHTML =
-      `Team target <strong>$${teamGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> split across <strong>${teamBas}</strong> BAs (even share for your progress bar). ` +
+      `Team-based target — commission is on the <strong>team</strong> total. ` +
+      `Your contribution so far: <strong>$${myShare.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>. ` +
       (remain > 0
-        ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to reach your share.`
-        : `<strong>Share reached</strong> — great work.`);
+        ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left for the team to reach <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>.`
+        : `<strong>Team target reached</strong> — great work!`);
   } else {
+    subEl.innerHTML =
+      `You: <strong>$${progress.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
+      `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
     footEl.innerHTML =
       remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to hit your personal target.`

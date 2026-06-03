@@ -7,11 +7,12 @@
 -- Every user (BA or manager) gets a row here after they sign up.
 -- It extends Supabase's built-in auth system which handles passwords.
 create table if not exists public.profiles (
-  id        uuid primary key references auth.users(id) on delete cascade,
-  name      text not null,
-  role      text not null check (role in ('manager', 'ba')),
-  team      text,   -- Cairo / Sharm / Hurgadah
-  store     text    -- which store they work at
+  id         uuid primary key references auth.users(id) on delete cascade,
+  name       text not null,
+  role       text not null check (role in ('manager', 'ba')),
+  team       text,   -- Cairo / Sharm / Hurgadah
+  store      text,   -- which store they work at
+  start_date date    -- first active day; dashboard hides the BA before this month
 );
 
 -- TABLE 2: sales_entries
@@ -65,6 +66,11 @@ create table if not exists public.ba_attendance_entries (
 -- Add working_days to existing databases (safe to run even if column already exists)
 alter table public.sales_entries
   add column if not exists working_days integer not null default 1;
+
+-- Add start_date to existing databases (safe to run even if column already exists).
+-- Backfill is handled by web_app/sql/add_profiles_start_date.sql on the live DB.
+alter table public.profiles
+  add column if not exists start_date date;
 
 -- De-duplicate exact same BA/date/store/shift rows (keep newest), then prevent future duplicates.
 -- Important: some historical imports may have ba_id = null, so we fallback to ba_name in the key.
@@ -303,6 +309,7 @@ declare
   n_sales int;
   n_att int;
   norm_match text;
+  v_min date;
 begin
   norm_match := public.normalize_ba_name(coalesce(nullif(trim(p_import_match_name), ''), p_display_name));
   if public.normalize_ba_name(p_display_name) = '' or p_user_id is null then
@@ -322,6 +329,17 @@ begin
   where ba_id is null
     and public.normalize_ba_name(ba_name) = norm_match;
   get diagnostics n_att = row_count;
+
+  -- Pull start_date back to the earliest linked row (LEAST ignores NULLs).
+  select least(
+    (select min(entry_date) from public.sales_entries where ba_id = p_user_id),
+    (select min(entry_date) from public.ba_attendance_entries where ba_id = p_user_id)
+  ) into v_min;
+  if v_min is not null then
+    update public.profiles
+    set start_date = case when start_date is null then v_min else least(start_date, v_min) end
+    where id = p_user_id;
+  end if;
 
   return json_build_object('ok', true, 'sales_linked', n_sales, 'attendance_linked', n_att);
 end;
@@ -425,13 +443,14 @@ begin
   v_name := trim(coalesce(new.raw_user_meta_data->>'name', 'Unknown'));
   v_team := nullif(trim(coalesce(new.raw_user_meta_data->>'team', '')), '');
 
-  insert into public.profiles (id, name, role, team, store)
+  insert into public.profiles (id, name, role, team, store, start_date)
   values (
     new.id,
     v_name,
     coalesce(new.raw_user_meta_data->>'role', 'ba'),
     v_team,
-    nullif(trim(coalesce(new.raw_user_meta_data->>'store', '')), '')
+    nullif(trim(coalesce(new.raw_user_meta_data->>'store', '')), ''),
+    (now() at time zone 'Africa/Cairo')::date
   );
 
   if coalesce(new.raw_user_meta_data->>'role', 'ba') = 'ba' then
@@ -449,3 +468,44 @@ $$;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- ── Team-total month progress (for team_total targets) ───────────
+-- For teams whose monthly target is target_type = 'team_total' (e.g. Hurgadah,
+-- where commission is team-based), every BA should see the SAME team goal and
+-- the team's COMBINED progress — not their individual share. RLS only lets a BA
+-- read their own sales rows, so this SECURITY DEFINER function returns just the
+-- team's deduped total (a single number, no per-BA rows) for the caller's own
+-- team. Team is derived from auth.uid(); a caller can never read another team.
+-- Dedup matches the manager dashboard's natural key (ba, date, store, shift).
+create or replace function public.get_team_month_total(p_month_key text)
+returns numeric
+language sql
+security definer
+set search_path = public
+as $$
+  with my_team as (
+    select lower(btrim(team)) as t from public.profiles where id = auth.uid()
+  ),
+  scoped as (
+    select distinct on (
+        coalesce(s.ba_id::text, lower(btrim(s.ba_name))),
+        s.entry_date, lower(btrim(s.store)), s.shift
+      )
+      s.sales_amount
+    from public.sales_entries s, my_team
+    where (
+            lower(btrim(s.team)) = my_team.t
+            or (my_team.t in ('hurgadah','hurghada')
+                and lower(btrim(s.team)) in ('hurgadah','hurghada'))
+          )
+      and to_char(s.entry_date, 'YYYY-MM') = p_month_key
+    order by
+      coalesce(s.ba_id::text, lower(btrim(s.ba_name))),
+      s.entry_date, lower(btrim(s.store)), s.shift,
+      (s.ba_id is not null) desc, s.sales_amount desc
+  )
+  select coalesce(sum(sales_amount), 0)::numeric from scoped;
+$$;
+
+revoke all on function public.get_team_month_total(text) from public;
+grant execute on function public.get_team_month_total(text) to authenticated;

@@ -860,6 +860,9 @@ function normalizeStore(store, team) {
   const raw = String(store || '').trim();
   const s = raw.toLowerCase();
 
+  // HPP animation spot (Terminal 3, Cairo) — checked before Terminal 3 so its
+  // sales are tracked as a separate sub-shop, not folded into regular Terminal 3.
+  if (/hpp/.test(s))          return { city: 'Cairo', subShop: 'Terminal 3 — HPP' };
   if (/terminal\s*1/.test(s)) return { city: 'Cairo', subShop: 'Terminal 1' };
   if (/terminal\s*2/.test(s)) return { city: 'Cairo', subShop: 'Terminal 2' };
   if (/terminal\s*3/.test(s)) return { city: 'Cairo', subShop: 'Terminal 3' };
@@ -1166,7 +1169,7 @@ function setMainTab(tab) {
 }
 
 async function loadTeamHeadcount() {
-  const { data, error } = await sb.from('profiles').select('id, name, team, store, role').eq('role', 'ba');
+  const { data, error } = await sb.from('profiles').select('id, name, team, store, role, start_date').eq('role', 'ba');
   if (error) return;
   const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
   allBaProfiles = (data || [])
@@ -1176,6 +1179,7 @@ async function loadTeamHeadcount() {
       name: formatBaDisplayName(p.name),
       team: canonicalTeamName(p.team),
       store: String(p.store || '').trim(),
+      start_date: p.start_date || null,
     }));
   allBaProfiles.forEach(p => {
     if (counts[p.team] !== undefined) counts[p.team] += 1;
@@ -2458,6 +2462,9 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
   const rows = [];
   bas.forEach(profile => {
     if (isDashboardExcludedProfile(profile)) return;
+    // Hide a BA from months before they joined (start_date). Profiles synthesized
+    // from this month's own entries have no start_date and are never skipped.
+    if (profile.start_date && monthKey < String(profile.start_date).slice(0, 7)) return;
     if (teamFilter && profile.team !== teamFilter) return;
     if (!baPassesShopFilter(profile, cityFilter, monthKey)) return;
 
@@ -2484,6 +2491,11 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
     });
 
     const cells = dates.map(date => {
+      // Days before the BA joined are not "missing" — treat as neutral (covers a
+      // mid-month start, e.g. someone who joined on the 15th).
+      if (profile.start_date && date < normalizeEntryDate(profile.start_date)) {
+        return { date, status: 'future', label: 'Before BA joined' };
+      }
       if (isCurrent && date > checkEnd) {
         return { date, status: 'future', label: 'Upcoming — not due yet' };
       }
