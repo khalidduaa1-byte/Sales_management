@@ -1222,6 +1222,40 @@ function commissionRateFromPct(pct) {
   return 0;
 }
 
+// ── Target proration for leave ───────────────────────────────────
+// per_ba targets are prorated down when a BA takes >= 3 days of annual leave in
+// the month: target * (daysInMonth - leaveDays) / daysInMonth. team_total targets
+// are NEVER prorated. Off days, sick leave and public holidays do not count.
+const PRORATE_LEAVE_STATUSES = ['annual_leave'];
+const PRORATE_MIN_DAYS = 3;
+
+function daysInMonthKey(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+/** Countable leave days (annual + public holiday) for a BA in a month. */
+function countableLeaveDays(baName, team, monthKey) {
+  const dates = new Set();
+  attendanceEntries.forEach(e => {
+    if (monthKeyFromEntryDate(e.entry_date) !== monthKey) return;
+    if (canonicalTeamName(e.team) !== team) return;
+    if (e.ba_name !== baName) return;
+    if (!PRORATE_LEAVE_STATUSES.includes(e.status)) return;
+    dates.add(normalizeEntryDate(e.entry_date));
+  });
+  return dates.size;
+}
+
+/** Prorate a per_ba base target by a BA's countable leave. Returns {target, prorated, leaveDays}. */
+function proratePerBaTarget(baseTarget, monthKey, leaveDays) {
+  if (!baseTarget || leaveDays < PRORATE_MIN_DAYS) {
+    return { target: baseTarget, prorated: false, leaveDays };
+  }
+  const dim = daysInMonthKey(monthKey);
+  return { target: Math.round(baseTarget * (dim - leaveDays) / dim), prorated: true, leaveDays };
+}
+
 // ── Load all entries ─────────────────────────────────────────────
 async function loadAll() {
   const { data, error } = await fetchAllTableRows('sales_entries', 'entry_date', false);
@@ -1594,10 +1628,12 @@ function computeCommissionRows() {
         rate = teamRates[row.team] || 0;
         basis = `$${fmt(t?.target || 0)}`;
       } else if (cfg?.type === 'per_ba') {
-        const baTarget = cfg.value;
+        const leaveDays = countableLeaveDays(row.ba_name, row.team, month);
+        const pr = proratePerBaTarget(cfg.value, month, leaveDays);
+        const baTarget = pr.target;
         attainment = baTarget ? (row.sales / baTarget) * 100 : 0;
         rate = commissionRateFromPct(attainment);
-        basis = `$${fmt(baTarget)}`;
+        basis = pr.prorated ? `$${fmt(baTarget)} (−${pr.leaveDays}d leave)` : `$${fmt(baTarget)}`;
       }
 
       const commission = row.sales * rate;

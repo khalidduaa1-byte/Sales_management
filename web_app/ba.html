@@ -696,8 +696,34 @@ async function computePersonalMonthlyTarget(monthKey, teamCanon) {
     // team's combined progress (commission is team-based, not per-BA). No split.
     return { goal: value, mode: 'team_total', teamGoal: value, raw: tRow };
   }
-  // per_ba: each BA's personal goal is the target value itself.
-  return { goal: value, mode: 'per_ba', raw: tRow };
+  // per_ba: personal goal = target value, prorated down when this BA had >= 3
+  // days of annual leave this month (off/sick/public-holiday days don't count).
+  const leaveDays = await myCountableLeaveDays(monthKey);
+  let goal = value, prorated = false;
+  if (value && leaveDays >= 3) {
+    const dim = daysInMonthKey(monthKey);
+    goal = Math.round(value * (dim - leaveDays) / dim);
+    prorated = true;
+  }
+  return { goal, mode: 'per_ba', baseGoal: value, prorated, leaveDays, raw: tRow };
+}
+
+function daysInMonthKey(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+/** This BA's annual-leave day count for the month (for target proration). */
+async function myCountableLeaveDays(monthKey) {
+  const { start, end } = monthDateBounds(monthKey);
+  const { data, error } = await sb
+    .from('ba_attendance_entries')
+    .select('entry_date,status')
+    .eq('ba_id', currentUser.id)
+    .gte('entry_date', start).lte('entry_date', end)
+    .in('status', ['annual_leave']);
+  if (error || !data) return 0;
+  return new Set(data.map(r => r.entry_date)).size;
 }
 
 function baFirstName(fullName) {
@@ -793,7 +819,7 @@ async function renderTargetBanner(monthSales) {
   const monthTitle = document.getElementById('target-month-title');
   if (monthTitle) monthTitle.textContent = `Monthly target — ${formatMonthLabel(monthKey)}`;
 
-  const { goal, mode } = await computePersonalMonthlyTarget(monthKey, team);
+  const { goal, mode, prorated, leaveDays, baseGoal } = await computePersonalMonthlyTarget(monthKey, team);
   const myShare = sumSalesAmount(monthSales || []);
 
   if (goal == null || !Number.isFinite(goal) || goal <= 0) {
@@ -837,9 +863,12 @@ async function renderTargetBanner(monthSales) {
       `You: <strong>$${progress.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong><br/>` +
       `Goal: <strong>$${goal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong>`;
     footEl.innerHTML =
-      remain > 0
+      (remain > 0
         ? `<strong>$${remain.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> left to hit your personal target.`
-        : `Personal target reached — great work.`;
+        : `Personal target reached — great work.`) +
+      (prorated
+        ? `<br/><span style="color:#64748b">Target adjusted for ${leaveDays} leave days (was $${baseGoal.toLocaleString('en-US', { maximumFractionDigits: 0 })}).</span>`
+        : '');
   }
 
   barEl.style.width = `${Math.min(100, pct)}%`;
