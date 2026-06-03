@@ -112,6 +112,14 @@ body {
   text-transform: uppercase;
   margin-bottom: 8px;
 }
+.month-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
+.month-nav h3 { margin-bottom: 0; min-width: 150px; text-align: center; }
+.month-nav-btn {
+  background: #fff; border: 1px solid #bfdbfe; color: #1e40af;
+  width: 28px; height: 28px; border-radius: 50%; font-size: 18px; line-height: 1;
+  cursor: pointer; flex: none; padding: 0; font-weight: 700;
+}
+.month-nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 .target-row {
   display: flex;
   justify-content: space-between;
@@ -345,7 +353,11 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
 <div class="target-banner" id="target-banner-wrap">
   <div class="target-card" id="target-card">
     <p class="ba-greeting" id="ba-greeting">Loading your month…</p>
-    <h3 id="target-month-title">Monthly target</h3>
+    <div class="month-nav">
+      <button class="month-nav-btn" id="month-prev" type="button" aria-label="Previous month">‹</button>
+      <h3 id="target-month-title">Monthly target</h3>
+      <button class="month-nav-btn" id="month-next" type="button" aria-label="Next month">›</button>
+    </div>
     <div class="target-row">
       <div class="big" id="target-attain-pct">—</div>
       <div class="sub" id="target-attain-sub">Loading…</div>
@@ -381,7 +393,7 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <h3>Log a Sale 📋</h3>
 
     <label>Date</label>
-    <input type="date" id="entry-date"/>
+    <input type="date" id="entry-date" dir="ltr" lang="en-GB"/>
 
     <label>Shop</label>
     <select id="entry-store">
@@ -412,11 +424,11 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <div class="date-range-row">
       <div>
         <label>From</label>
-        <input type="date" id="leave-from"/>
+        <input type="date" id="leave-from" dir="ltr" lang="en-GB"/>
       </div>
       <div>
         <label>Till</label>
-        <input type="date" id="leave-till"/>
+        <input type="date" id="leave-till" dir="ltr" lang="en-GB"/>
       </div>
     </div>
 
@@ -559,9 +571,35 @@ function populateShopOptions() {
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
-function selectedMonthKey() {
+const EARLIEST_MONTH = '2026-01';
+function currentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+let viewedMonth = currentMonthKey();
+function selectedMonthKey() { return viewedMonth; }
+
+function shiftMonthKey(monthKey, delta) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Move the viewed month (BAs can review/log past months; no future, back to data start). */
+async function changeMonth(delta) {
+  const next = shiftMonthKey(viewedMonth, delta);
+  if (next > currentMonthKey() || next < EARLIEST_MONTH) return;
+  viewedMonth = next;
+  invalidateMonthSalesCache();
+  updateMonthNav();
+  await refreshBaDashboard();
+}
+
+function updateMonthNav() {
+  const prev = document.getElementById('month-prev');
+  const next = document.getElementById('month-next');
+  if (prev) prev.disabled = (viewedMonth <= EARLIEST_MONTH);
+  if (next) next.disabled = (viewedMonth >= currentMonthKey());
 }
 
 function monthDateBounds(monthKey) {
@@ -669,6 +707,7 @@ function renderStatsFromRows(monthSales) {
 
 /** Reload sales + target + history from one DB read (all BAs use this). */
 async function refreshBaDashboard() {
+  updateMonthNav();
   const { rows, error } = await getMyMonthSales(true);
   if (error) {
     showMsg('Could not load your sales. Check your connection and refresh the page.', 'error');
@@ -1233,6 +1272,15 @@ document.getElementById('history-list').addEventListener('click', (e) => {
     deleteAttendance(attId);
   }
 });
+
+// Month navigation (listeners, not inline onclick — more reliable in BA browsers)
+(function wireMonthNav() {
+  const prev = document.getElementById('month-prev');
+  const next = document.getElementById('month-next');
+  if (prev) prev.addEventListener('click', () => changeMonth(-1));
+  if (next) next.addEventListener('click', () => changeMonth(1));
+  updateMonthNav();
+})();
 
 // Explicit globals for other inline handlers (submitSale, signOut, …).
 window.deleteSale = deleteSale;

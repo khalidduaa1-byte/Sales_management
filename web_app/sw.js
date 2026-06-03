@@ -1,5 +1,5 @@
 /* Minimal service worker — enables “Add to Home Screen” / installed app mode. Network-first (always live data). */
-const SW_VERSION = 'ba-sales-v8';
+const SW_VERSION = 'ba-sales-v9';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
