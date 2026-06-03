@@ -85,9 +85,11 @@ All three HTML files include `@supabase/supabase-js@2` from CDN and instantiate 
 
 Schema lives in `web_app/setup.sql` — the canonical source. Core tables:
 
-- **`profiles`** — extends `auth.users` with `role` (`manager`|`ba`), `team`, `store`
+- **`profiles`** — extends `auth.users` with `role` (`manager`|`ba`), `team`, `store`, `start_date` (first active day; the Missing Sales calendar hides a BA in months before it. Backfilled from earliest activity; new signups stamped at registration via `handle_new_user`; pulled earlier when legacy rows are linked)
 - **`sales_entries`** — one row per BA per shift; `working_days` lets historical monthly rows carry a count instead of duplicating
-- **`monthly_targets`** — manager-configurable per-team-per-month; `target_type` = `per_ba` (× active BAs) or `team_total`
+- **`monthly_targets`** — manager-configurable per-team-per-month; `target_type` = `per_ba` or `team_total`.
+  - `team_total` (e.g. Hurghada): every BA sees the **same team goal + combined team progress** (via the `get_team_month_total()` SECURITY DEFINER fn), never split by headcount. Adding/removing a BA doesn't change it. Never prorated.
+  - `per_ba` (Cairo, Sharm): auto-**prorated down for 3+ days of annual leave** in the month — `target × (calendar days − annual-leave days) ÷ calendar days`. Only annual leave counts (off days, sick leave, public holidays do **not**). Drives both the displayed target and commission attainment. Computed client-side from `ba_attendance_entries`, no stored value.
 - **`ba_attendance_entries`** — leave/off-day tracking; status ∈ `off_day | annual_leave | public_holiday | sick_leave | other`; unique `(ba_id, entry_date)`
 
 Two uniqueness indexes on `sales_entries`: one for live BA-app rows (`ba_id, entry_date, store, shift`), one for legacy rows where `ba_id is null` (falls back to `lower(ba_name)`). Both are critical — duplicate prevention is the most common source of bugs.
@@ -177,6 +179,7 @@ These look like gaps; they're decisions. Don't "fix" them without asking.
 - **Don't refactor `manager.html` lightly** — see Intentional non-choices.
 - **The anon key in HTML is public on purpose** — see Invariant #1.
 - **iOS PWA install is finicky.** The "green install button" only shows on Chrome/Android via `beforeinstallprompt`; iOS users must Share → Add to Home Screen. In-app browsers (WhatsApp/Instagram) can't install at all — `pwa.js` detects these and shows a hint to open in Safari.
+- **Temporary HPP shop (remove after the event).** `ba.html` has a time-boxed `'Terminal 3 — HPP (animation)'` shop for Cairo BAs (`HPP_CAIRO_SHOP` / `HPP_VISIBLE_UNTIL`, ran 1–10 June 2026, auto-hidden after 13 June). `manager.html` `normalizeStore` maps `/hpp/` to a separate Cairo sub-shop. Delete the `ba.html` block once the event is well past (the `normalizeStore` rule can stay — harmless). Pattern to copy for future pop-up/animation spots.
 
 ## Gitignore quirks worth knowing
 
