@@ -440,6 +440,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <button class="page-tab-btn" id="tab-profile" onclick="setMainTab('profile')">BA Profile</button>
       <button class="page-tab-btn" id="tab-shops" onclick="setMainTab('shops')">Shops</button>
       <button class="page-tab-btn" id="tab-missing" onclick="setMainTab('missing')">Missing Sales</button>
+      <button class="page-tab-btn" id="tab-hpp" onclick="setMainTab('hpp')">HPP</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
@@ -701,6 +702,36 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
         <tbody id="missing-body">
           <tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">Select a month to check missing submissions</td></tr>
         </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HPP animation-spot sales -->
+  <div class="sec-lbl hpp-section" style="display:none">HPP — Animation Spot Sales</div>
+  <p class="hpp-section" id="hpp-note" style="display:none;font-size:12px;color:#6b7280;margin:-6px 0 14px"></p>
+  <div class="kpi-grid hpp-section" style="display:none">
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-sales">—</div><div class="kpi-lbl">Total HPP Sales</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-items">—</div><div class="kpi-lbl">Items Sold at HPP</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-days">—</div><div class="kpi-lbl">Active HPP Days</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-bas">—</div><div class="kpi-lbl">BAs Who Sold at HPP</div></div>
+  </div>
+
+  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">HPP runs (auto-detected from logged sales)</div>
+  <div class="table-card hpp-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Period</th><th>Shop</th><th>Days</th><th>BAs</th><th>Items</th><th>Sales</th><th>Avg / Day</th></tr></thead>
+        <tbody id="hpp-runs-body"><tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">HPP sales by ambassador</div>
+  <div class="table-card hpp-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>BA</th><th>Team</th><th>Days at HPP</th><th>Items</th><th>Sales</th></tr></thead>
+        <tbody id="hpp-ba-body"><tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1155,17 +1186,22 @@ function setMainTab(tab) {
   document.querySelectorAll('.missing-section').forEach(el => {
     el.style.display = tab === 'missing' ? '' : 'none';
   });
+  document.querySelectorAll('.hpp-section').forEach(el => {
+    el.style.display = tab === 'hpp' ? '' : 'none';
+  });
   document.getElementById('tab-performance').classList.toggle('active', tab === 'performance');
   document.getElementById('tab-targets').classList.toggle('active', tab === 'targets');
   document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
   document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
   document.getElementById('tab-shops').classList.toggle('active', tab === 'shops');
   document.getElementById('tab-missing').classList.toggle('active', tab === 'missing');
+  document.getElementById('tab-hpp').classList.toggle('active', tab === 'hpp');
   if (tab === 'daily') renderDailySales();
   if (tab === 'profile') renderBAProfile();
   if (tab === 'missing') renderMissingSubmissions();
   if (tab === 'performance') refreshPerformanceCharts();
   if (tab === 'shops') refreshShopCharts();
+  if (tab === 'hpp') renderHpp();
 }
 
 async function loadTeamHeadcount() {
@@ -2886,6 +2922,93 @@ function exportCommissions() {
 async function signOut() { await sb.auth.signOut(); window.location.href = 'index.html'; }
 
 // ── Helpers ──────────────────────────────────────────────────────
+// ── HPP (animation-spot) tab ─────────────────────────────────────
+function isHppEntry(e) { return /hpp/i.test(String(e.store || '')); }
+
+function renderHpp() {
+  const rows = (allEntries || []).filter(e => isHppEntry(e) && !isDashboardExcludedEntry(e));
+
+  const totalSales = rows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
+  const totalItems = rows.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
+  const days = new Set(rows.map(e => normalizeEntryDate(e.entry_date)));
+  const bas  = new Set(rows.map(e => registeredBaName(e)));
+  setText('hpp-kv-sales', '$' + fmt(totalSales));
+  setText('hpp-kv-items', fmt(totalItems));
+  setText('hpp-kv-days', fmt(days.size));
+  setText('hpp-kv-bas', fmt(bas.size));
+
+  const note = document.getElementById('hpp-note');
+  if (note) note.innerHTML = rows.length
+    ? 'HPP = temporary animation-spot sales (shop tagged “HPP”), across the whole pilot. <em>Share the animation calendar and I can label each run by event and flag event-days with no sales.</em>'
+    : 'No HPP sales logged yet. When an HPP runs, ambassadors log it under the “Terminal 3 — HPP (animation)” shop and it appears here.';
+
+  // HPP runs = contiguous date ranges per HPP shop.
+  const runsBody = document.getElementById('hpp-runs-body');
+  if (runsBody) {
+    if (!rows.length) {
+      runsBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No HPP sales yet</td></tr>';
+    } else {
+      const byStore = {};
+      rows.forEach(e => { const k = String(e.store || '').trim(); (byStore[k] = byStore[k] || []).push(e); });
+      const runs = [];
+      Object.entries(byStore).forEach(([store, es]) => {
+        const dates = [...new Set(es.map(e => normalizeEntryDate(e.entry_date)))].sort();
+        const flush = (s, p) => {
+          const inRange = es.filter(e => { const d = normalizeEntryDate(e.entry_date); return d >= s && d <= p; });
+          runs.push({
+            store, start: s, end: p,
+            days: new Set(inRange.map(e => normalizeEntryDate(e.entry_date))).size,
+            bas: new Set(inRange.map(e => registeredBaName(e))).size,
+            items: inRange.reduce((a, e) => a + (Number(e.items_sold) || 0), 0),
+            sales: inRange.reduce((a, e) => a + (Number(e.sales_amount) || 0), 0),
+          });
+        };
+        let startD = null, prevD = null;
+        dates.forEach(d => {
+          if (startD === null) { startD = d; prevD = d; return; }
+          if ((new Date(d) - new Date(prevD)) / 86400000 > 1) { flush(startD, prevD); startD = d; }
+          prevD = d;
+        });
+        if (startD !== null) flush(startD, prevD);
+      });
+      runs.sort((a, b) => (a.start < b.start ? 1 : -1));
+      runsBody.innerHTML = runs.map(r => `<tr>
+        <td>${fmtDate(r.start)}${r.end !== r.start ? ' – ' + fmtDate(r.end) : ''}</td>
+        <td>${r.store}</td>
+        <td>${r.days}</td>
+        <td>${r.bas}</td>
+        <td>${fmt(r.items)}</td>
+        <td class="cell-amount">$${fmt(r.sales)}</td>
+        <td>$${fmt(Math.round(r.sales / Math.max(1, r.days)))}</td>
+      </tr>`).join('');
+    }
+  }
+
+  // HPP sales by ambassador.
+  const baBody = document.getElementById('hpp-ba-body');
+  if (baBody) {
+    if (!rows.length) {
+      baBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">No HPP sales yet</td></tr>';
+    } else {
+      const byBa = {};
+      rows.forEach(e => {
+        const name = registeredBaName(e), team = canonicalTeamName(e.team), k = name + '|' + team;
+        if (!byBa[k]) byBa[k] = { name, team, days: new Set(), items: 0, sales: 0 };
+        byBa[k].days.add(normalizeEntryDate(e.entry_date));
+        byBa[k].items += Number(e.items_sold) || 0;
+        byBa[k].sales += Number(e.sales_amount) || 0;
+      });
+      baBody.innerHTML = Object.values(byBa).sort((a, b) => b.sales - a.sales).map(b => `<tr>
+        <td class="cell-name"><span class="team-dot t${b.team}"></span>${b.name}</td>
+        <td>${b.team}</td>
+        <td>${b.days.size}</td>
+        <td>${fmt(b.items)}</td>
+        <td class="cell-amount">$${fmt(b.sales)}</td>
+      </tr>`).join('');
+    }
+  }
+}
+
 function fmt(n)    { return Number(n).toLocaleString('en-US',{maximumFractionDigits:0}); }
 function fmtDate(s){ return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
 function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
