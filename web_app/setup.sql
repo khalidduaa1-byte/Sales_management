@@ -102,9 +102,46 @@ create unique index if not exists sales_entries_unique_name_date_store_shift_whe
 
 alter table public.monthly_targets enable row level security;
 alter table public.ba_attendance_entries enable row level security;
+alter table public.animation_events enable row level security;
+alter table public.animation_daily  enable row level security;
 alter table public.ba_attendance_entries drop constraint if exists ba_attendance_entries_status_check;
 alter table public.ba_attendance_entries add constraint ba_attendance_entries_status_check
   check (status in ('off_day', 'annual_leave', 'public_holiday', 'sick_leave', 'other'));
+
+-- TABLE 5: animation_events
+-- The EGYPT AIR animation-spot calendar. Drives which animation shop appears in
+-- the BA app shop dropdown, automatically, during each event window. Managers add
+-- future events with one INSERT. Seed data lives in web_app/sql/add_animation_calendar.sql.
+create table if not exists public.animation_events (
+  id                 uuid primary key default gen_random_uuid(),
+  name               text not null,        -- BA-facing shop label, e.g. 'Terminal 3 — 702A (animation)'
+  team               text not null check (team in ('Cairo', 'Sharm', 'Hurgadah')),
+  campaign           text,                 -- reference only (The One / Light Blue / Devotion / Holidays)
+  start_date         date not null,
+  end_date           date not null,
+  entry_buffer_days  integer not null default 3,  -- BAs may still log this many days after end_date
+  target_pcs_per_day integer,
+  created_at         timestamptz default now(),
+  unique (name, start_date)
+);
+
+-- TABLE 6: animation_daily
+-- Daily actuals for animations that ALREADY happened. Reference ONLY — feeds the
+-- manager "Animations" tab. These sales are already inside the monthly totals, so
+-- they must NEVER be inserted into sales_entries (would double-count — Invariant #3).
+create table if not exists public.animation_daily (
+  id           uuid primary key default gen_random_uuid(),
+  event_id     uuid references public.animation_events(id) on delete set null,
+  store_label  text not null,
+  team         text not null check (team in ('Cairo', 'Sharm', 'Hurgadah')),
+  campaign     text,
+  entry_date   date not null,
+  target_pcs   integer,
+  qty_sold     integer not null default 0,
+  sales_amount numeric(12,2) not null default 0,  -- same unit as the app ($)
+  created_at   timestamptz default now(),
+  unique (store_label, entry_date)
+);
 
 -- ── Row Level Security (RLS) ─────────────────────────────────────
 -- RLS means: users can only see/edit data they're allowed to.
@@ -272,6 +309,30 @@ create policy "BAs can delete own attendance"
 create policy "Managers can read all attendance"
   on public.ba_attendance_entries for select
   using (public.is_manager());
+
+-- Animation calendar + historical actuals: everyone signed-in reads, managers write.
+drop policy if exists "Anyone can read animation events"   on public.animation_events;
+drop policy if exists "Managers can write animation events" on public.animation_events;
+drop policy if exists "Anyone can read animation daily"     on public.animation_daily;
+drop policy if exists "Managers can write animation daily"  on public.animation_daily;
+
+create policy "Anyone can read animation events"
+  on public.animation_events for select
+  using (auth.uid() is not null);
+
+create policy "Managers can write animation events"
+  on public.animation_events for all
+  using (public.is_manager())
+  with check (public.is_manager());
+
+create policy "Anyone can read animation daily"
+  on public.animation_daily for select
+  using (auth.uid() is not null);
+
+create policy "Managers can write animation daily"
+  on public.animation_daily for all
+  using (public.is_manager())
+  with check (public.is_manager());
 
 -- ── Auto-update updated_at on monthly_targets ────────────────────
 create or replace function public.set_updated_at()

@@ -440,7 +440,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
       <button class="page-tab-btn" id="tab-profile" onclick="setMainTab('profile')">BA Profile</button>
       <button class="page-tab-btn" id="tab-shops" onclick="setMainTab('shops')">Shops</button>
       <button class="page-tab-btn" id="tab-missing" onclick="setMainTab('missing')">Missing Sales</button>
-      <button class="page-tab-btn" id="tab-hpp" onclick="setMainTab('hpp')">HPP</button>
+      <button class="page-tab-btn" id="tab-hpp" onclick="setMainTab('hpp')">Animations</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="sec-lbl" style="margin:0">Month</span>
@@ -706,17 +706,38 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
-  <!-- HPP animation-spot sales -->
-  <div class="sec-lbl hpp-section" style="display:none">HPP — Animation Spot Sales</div>
+  <!-- Animation-spot sales -->
+  <div class="sec-lbl hpp-section" style="display:none">Animations — Spot Sales</div>
   <p class="hpp-section" id="hpp-note" style="display:none;font-size:12px;color:#6b7280;margin:-6px 0 14px"></p>
-  <div class="kpi-grid hpp-section" style="display:none">
-    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-sales">—</div><div class="kpi-lbl">Total HPP Sales</div></div>
-    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-items">—</div><div class="kpi-lbl">Items Sold at HPP</div></div>
-    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-days">—</div><div class="kpi-lbl">Active HPP Days</div></div>
-    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-bas">—</div><div class="kpi-lbl">BAs Who Sold at HPP</div></div>
+
+  <!-- Full-year calendar overview (click a row to focus that animation) -->
+  <div class="sec-lbl hpp-section" style="display:none">2026 Animation Calendar</div>
+  <div class="table-card hpp-section" style="display:none">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Campaign</th><th>Spot</th><th>Team</th><th>Dates</th><th>Status</th><th>Target/Day</th><th>Items</th><th>Sales</th></tr></thead>
+        <tbody id="hpp-overview-body"><tr><td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">HPP sales by day</div>
+  <!-- Filter + export controls -->
+  <div class="hpp-section" style="display:none;margin:14px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:13px;color:#374151;font-weight:600">Show:</label>
+      <select id="hpp-filter" onchange="setHppFilter(this.value)" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;max-width:340px"></select>
+    </div>
+    <button id="hpp-export-btn" onclick="exportHpp()" style="background:#111827;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">⬇ Export to Excel</button>
+  </div>
+
+  <div class="kpi-grid hpp-section" style="display:none">
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-sales">—</div><div class="kpi-lbl">Total Animation Sales</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-items">—</div><div class="kpi-lbl">Items Sold at Animations</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-days">—</div><div class="kpi-lbl">Active Animation Days</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="hpp-kv-bas">—</div><div class="kpi-lbl">BAs Who Sold at Animations</div></div>
+  </div>
+
+  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">Animation sales by day</div>
   <div class="table-card hpp-section" style="display:none">
     <div class="tbl-wrap">
       <table>
@@ -727,7 +748,7 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
-  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">HPP runs (auto-detected from logged sales)</div>
+  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">Animation runs (auto-detected from sales)</div>
   <div class="table-card hpp-section" style="display:none">
     <div class="tbl-wrap">
       <table>
@@ -737,11 +758,11 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     </div>
   </div>
 
-  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">HPP sales by ambassador</div>
+  <div class="sec-lbl hpp-section" style="display:none;margin-top:18px">Animation sales by ambassador</div>
   <div class="table-card hpp-section" style="display:none">
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>BA</th><th>Team</th><th>Days at HPP</th><th>Items</th><th>Sales</th></tr></thead>
+        <thead><tr><th>BA</th><th>Team</th><th>Days at Animations</th><th>Items</th><th>Sales</th></tr></thead>
         <tbody id="hpp-ba-body"><tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr></tbody>
       </table>
     </div>
@@ -837,6 +858,13 @@ const TEAM_COLORS = { Cairo: '#059669', Sharm: '#2563eb', Hurgadah: '#ea580c' };
 const SHOP_CHART_COLORS = ['#2563eb', '#059669', '#ea580c', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5'];
 
 let allEntries = [];
+// Historical animation actuals (reference only — never added to any total). See renderHpp.
+let animationDaily = [];
+// The animation calendar (animation_events). Drives the Animations-tab overview + filter.
+let animationEvents = [];
+let hppFilterKey = '';     // '' = all animations; otherwise an eventKey()
+let hppEventsSorted = [];  // animationEvents sorted by start_date (shared by overview + filter)
+let hppExportSource = [];  // rows currently shown (respecting the filter) — used by Export to Excel
 let attendanceEntries = [];
 let sortCol = 'sales_amount', sortAsc = false;
 let viewMode = 'table';
@@ -902,9 +930,16 @@ function normalizeStore(store, team) {
   const raw = String(store || '').trim();
   const s = raw.toLowerCase();
 
-  // HPP animation spot (Terminal 3, Cairo) — checked before Terminal 3 so its
-  // sales are tracked as a separate sub-shop, not folded into regular Terminal 3.
-  if (/hpp/.test(s))          return { city: 'Cairo', subShop: 'Terminal 3 — HPP' };
+  // Animation pop-up spots — checked before the terminal rules so their sales are
+  // tracked as their own sub-shop and never folded into regular shop totals.
+  // Covers the legacy 'HPP' label and every 'Terminal N — <code> (animation)' label.
+  if (/animation|hpp/.test(s)) {
+    let acity = 'Cairo';
+    if (/sharm/.test(s)) acity = 'Sharm';
+    else if (/hurghada|hurgadah|russian|european/.test(s)) acity = 'Hurgadah';
+    const sub = raw.replace(/\s*\(animation\)\s*$/i, '').trim() || 'Animation';
+    return { city: acity, subShop: sub };
+  }
   if (/terminal\s*1/.test(s)) return { city: 'Cairo', subShop: 'Terminal 1' };
   if (/terminal\s*2/.test(s)) return { city: 'Cairo', subShop: 'Terminal 2' };
   if (/terminal\s*3/.test(s)) return { city: 'Cairo', subShop: 'Terminal 3' };
@@ -1326,6 +1361,24 @@ async function loadAll() {
   // silently dropped in the UI.
   dedupeDropped = 0;
   allEntries = rawEntries.filter(e => !isDashboardExcludedEntry(e));
+
+  // Historical animation actuals — loaded separately and shown ONLY in the
+  // Animations tab. Deliberately NOT merged into allEntries (would double-count).
+  const { data: animData, error: animError } = await fetchAllTableRows('animation_daily', 'entry_date', false);
+  if (animError) {
+    animationDaily = [];
+    console.warn('animation_daily not available:', animError.message);
+  } else {
+    animationDaily = animData || [];
+  }
+
+  const { data: animEvData, error: animEvError } = await fetchAllTableRows('animation_events', 'start_date', true);
+  if (animEvError) {
+    animationEvents = [];
+    console.warn('animation_events not available:', animEvError.message);
+  } else {
+    animationEvents = animEvData || [];
+  }
 
   const { data: attendanceData, error: attendanceError } = await fetchAllTableRows('ba_attendance_entries', 'entry_date', false);
   if (attendanceError) {
@@ -2933,16 +2986,139 @@ function exportCommissions() {
 async function signOut() { await sb.auth.signOut(); window.location.href = 'index.html'; }
 
 // ── Helpers ──────────────────────────────────────────────────────
-// ── HPP (animation-spot) tab ─────────────────────────────────────
-function isHppEntry(e) { return /hpp/i.test(String(e.store || '')); }
+// ── Animations tab ───────────────────────────────────────────────
+// "Animation" = any spot tagged '(animation)' (or the legacy 'HPP' label).
+function isHppEntry(e) { return /animation|hpp/i.test(String(e.store || '')); }
+
+// Historical animation actuals (animation_daily) presented as synthetic rows so
+// they flow through the same totals/by-day/by-run code. They carry no BA (flagged
+// _historical) and — critically — are NEVER part of allEntries, so they never touch
+// any shop or monthly total. They appear ONLY in this tab.
+function historicalAnimationRows() {
+  return (animationDaily || []).map(d => ({
+    store: d.store_label,
+    team: canonicalTeamName(d.team),
+    entry_date: normalizeEntryDate(d.entry_date),
+    items_sold: Number(d.qty_sold) || 0,
+    sales_amount: Number(d.sales_amount) || 0,
+    _historical: true,
+  }));
+}
+
+function eventKey(ev) { return ev.name + '__' + ev.start_date; }
+
+function rowMatchesEvent(row, ev) {
+  const d = normalizeEntryDate(row.entry_date);
+  return String(row.store || '') === ev.name && d >= ev.start_date && d <= ev.end_date;
+}
+
+function findEventForRow(row) {
+  return (animationEvents || []).find(ev => rowMatchesEvent(row, ev)) || null;
+}
+
+function rangeLabel(ev) {
+  const s = new Date(ev.start_date + 'T12:00:00'), e = new Date(ev.end_date + 'T12:00:00');
+  const mo = d => d.toLocaleDateString('en-GB', { month: 'short' });
+  return mo(s) === mo(e)
+    ? `${s.getDate()}–${e.getDate()} ${mo(e)}`
+    : `${s.getDate()} ${mo(s)} – ${e.getDate()} ${mo(e)}`;
+}
+
+function setHppFilter(v) { hppFilterKey = v || ''; renderHpp(); }
+
+function populateHppFilter() {
+  const sel = document.getElementById('hpp-filter');
+  if (!sel) return;
+  sel.innerHTML = ['<option value="">All animations</option>'].concat(
+    hppEventsSorted.map(ev =>
+      `<option value="${eventKey(ev)}">${ev.campaign || 'Animation'} — ${ev.name} (${rangeLabel(ev)})</option>`)
+  ).join('');
+  sel.value = hppFilterKey;
+}
+
+function renderHppOverview(allRows) {
+  const body = document.getElementById('hpp-overview-body');
+  if (!body) return;
+  if (!hppEventsSorted.length) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">No animations in the calendar yet</td></tr>';
+    return;
+  }
+  const today = new Date().toLocaleDateString('en-CA');
+  body.innerHTML = hppEventsSorted.map((ev, i) => {
+    const matched = allRows.filter(r => rowMatchesEvent(r, ev));
+    const items = matched.reduce((a, e) => a + (Number(e.items_sold) || 0), 0);
+    const sales = matched.reduce((a, e) => a + (Number(e.sales_amount) || 0), 0);
+    let status = 'Active', color = '#2563eb';
+    if (today < ev.start_date)      { status = 'Upcoming'; color = '#6b7280'; }
+    else if (today > ev.end_date)   { status = 'Done';     color = '#059669'; }
+    const team = canonicalTeamName(ev.team);
+    const hi = hppFilterKey === eventKey(ev) ? 'background:#eff6ff;' : '';
+    return `<tr onclick="setHppFilter('${eventKey(ev) === hppFilterKey ? '' : eventKey(ev).replace(/'/g, "\\'")}')" style="cursor:pointer;${hi}">
+      <td>${ev.campaign || '—'}</td>
+      <td>${ev.name}</td>
+      <td><span class="team-dot t${team}"></span>${team}</td>
+      <td>${rangeLabel(ev)}</td>
+      <td><span style="color:${color};font-weight:700">${status}</span></td>
+      <td>${ev.target_pcs_per_day != null ? ev.target_pcs_per_day : '—'}</td>
+      <td>${fmt(items)}</td>
+      <td class="cell-amount">$${fmt(sales)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function downloadCsv(text, filename) {
+  const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8;' }); // BOM → Excel reads UTF-8
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Export the per-day animation breakdown (respecting the current filter) as a
+// CSV that opens directly in Excel — one row per (date × spot).
+function exportHpp() {
+  const map = {};
+  (hppExportSource || []).forEach(e => {
+    const d = normalizeEntryDate(e.entry_date), store = String(e.store || '');
+    const k = d + '|' + store;
+    if (!map[k]) {
+      const ev = findEventForRow(e);
+      map[k] = { date: d, store, campaign: ev ? (ev.campaign || '') : '', team: canonicalTeamName(e.team),
+                 target: ev && ev.target_pcs_per_day != null ? ev.target_pcs_per_day : '', items: 0, sales: 0 };
+    }
+    map[k].items += Number(e.items_sold) || 0;
+    map[k].sales += Number(e.sales_amount) || 0;
+  });
+  const list = Object.values(map).sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : (a.store < b.store ? -1 : 1)));
+  if (!list.length) { alert('Nothing to export for this selection.'); return; }
+  const header = ['Date', 'Spot', 'Campaign', 'Team', 'Target PCs/Day', 'Items Sold', 'Sales ($)'];
+  const body = list.map(r => [r.date, r.store, r.campaign, r.team, r.target, r.items, r.sales.toFixed(2)]);
+  const csv = [header].concat(body).map(row => row.map(csvCell).join(',')).join('\r\n');
+  downloadCsv(csv, 'animations_' + (hppFilterKey ? 'filtered' : 'all') + '.csv');
+}
 
 function renderHpp() {
-  const rows = (allEntries || []).filter(e => isHppEntry(e) && !isDashboardExcludedEntry(e));
+  hppEventsSorted = (animationEvents || []).slice().sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
+  const live = (allEntries || []).filter(e => isHppEntry(e) && !isDashboardExcludedEntry(e));
+  const allRows = [...live, ...historicalAnimationRows()];
+
+  populateHppFilter();
+  renderHppOverview(allRows);
+
+  const selEv = hppFilterKey ? hppEventsSorted.find(ev => eventKey(ev) === hppFilterKey) : null;
+  const rows = selEv ? allRows.filter(r => rowMatchesEvent(r, selEv)) : allRows;
+  hppExportSource = rows;
 
   const totalSales = rows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
   const totalItems = rows.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
   const days = new Set(rows.map(e => normalizeEntryDate(e.entry_date)));
-  const bas  = new Set(rows.map(e => registeredBaName(e)));
+  const bas  = new Set(rows.filter(e => !e._historical).map(e => registeredBaName(e)));
   setText('hpp-kv-sales', '$' + fmt(totalSales));
   setText('hpp-kv-items', fmt(totalItems));
   setText('hpp-kv-days', fmt(days.size));
@@ -2950,22 +3126,22 @@ function renderHpp() {
 
   const note = document.getElementById('hpp-note');
   if (note) note.innerHTML = rows.length
-    ? 'HPP = temporary animation-spot sales (shop tagged “HPP”), across the whole pilot. <em>Share the animation calendar and I can label each run by event and flag event-days with no sales.</em>'
-    : 'No HPP sales logged yet. When an HPP runs, ambassadors log it under the “Terminal 3 — HPP (animation)” shop and it appears here.';
+    ? 'Animation = sales at temporary animation spots (shops tagged “(animation)”). Live spots are logged by ambassadors in the app; past spots shown here are pulled from the animation calendar and are <em>already included in the monthly totals</em> — they are not added on top.'
+    : 'No animation sales yet. When an animation runs, ambassadors log it under its “(animation)” shop and it appears here.';
 
   // HPP sales by day (per-day breakdown + average/day footer).
   const dailyBody = document.getElementById('hpp-daily-body');
   const dailyFoot = document.getElementById('hpp-daily-foot');
   if (dailyBody) {
     if (!rows.length) {
-      dailyBody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#9ca3af">No HPP sales yet</td></tr>';
+      dailyBody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#9ca3af">No animation sales yet</td></tr>';
       if (dailyFoot) dailyFoot.innerHTML = '';
     } else {
       const byDay = {};
       rows.forEach(e => {
         const d = normalizeEntryDate(e.entry_date);
         if (!byDay[d]) byDay[d] = { d, bas: new Set(), items: 0, sales: 0 };
-        byDay[d].bas.add(registeredBaName(e));
+        if (!e._historical) byDay[d].bas.add(registeredBaName(e));
         byDay[d].items += Number(e.items_sold) || 0;
         byDay[d].sales += Number(e.sales_amount) || 0;
       });
@@ -2990,7 +3166,7 @@ function renderHpp() {
   const runsBody = document.getElementById('hpp-runs-body');
   if (runsBody) {
     if (!rows.length) {
-      runsBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No HPP sales yet</td></tr>';
+      runsBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">No animation sales yet</td></tr>';
     } else {
       const byStore = {};
       rows.forEach(e => { const k = String(e.store || '').trim(); (byStore[k] = byStore[k] || []).push(e); });
@@ -3002,7 +3178,7 @@ function renderHpp() {
           runs.push({
             store, start: s, end: p,
             days: new Set(inRange.map(e => normalizeEntryDate(e.entry_date))).size,
-            bas: new Set(inRange.map(e => registeredBaName(e))).size,
+            bas: new Set(inRange.filter(e => !e._historical).map(e => registeredBaName(e))).size,
             items: inRange.reduce((a, e) => a + (Number(e.items_sold) || 0), 0),
             sales: inRange.reduce((a, e) => a + (Number(e.sales_amount) || 0), 0),
           });
@@ -3028,14 +3204,16 @@ function renderHpp() {
     }
   }
 
-  // HPP sales by ambassador.
+  // Animation sales by ambassador (live, app-logged rows only — historical
+  // actuals carry no BA, so they're excluded here while still counting in totals).
   const baBody = document.getElementById('hpp-ba-body');
   if (baBody) {
-    if (!rows.length) {
-      baBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">No HPP sales yet</td></tr>';
+    const baRows = rows.filter(e => !e._historical);
+    if (!baRows.length) {
+      baBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#9ca3af">No per-ambassador animation sales yet (past spots have no BA-level data)</td></tr>';
     } else {
       const byBa = {};
-      rows.forEach(e => {
+      baRows.forEach(e => {
         const name = registeredBaName(e), team = canonicalTeamName(e.team), k = name + '|' + team;
         if (!byBa[k]) byBa[k] = { name, team, days: new Set(), items: 0, sales: 0 };
         byBa[k].days.add(normalizeEntryDate(e.entry_date));

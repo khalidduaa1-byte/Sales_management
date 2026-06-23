@@ -391,9 +391,11 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
   <!-- Submit form -->
   <div class="form-card">
     <h3>Log a Sale 📋</h3>
+    <p id="regular-anim-hint" style="display:none;font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin:0 0 12px">🎯 Animation running — keep this entry for <b>regular shop sales only</b>. Log animation sales in the 🎯 Animation Sale card below.</p>
 
     <label>Date</label>
     <input type="date" id="entry-date" dir="ltr" lang="en-GB"/>
+    <div class="date-readout" id="entry-date-readout"></div>
 
     <label>Shop</label>
     <select id="entry-store">
@@ -415,6 +417,33 @@ input[type="number"] { font-size: 22px; font-weight: 700; }
     <input type="number" id="items-sold" placeholder="0" min="0" step="1"/>
 
     <button class="submit-btn" id="submit-btn" onclick="submitSale()">Log Entry ✓</button>
+  </div>
+
+  <!-- Animation sale — appears only during an active animation window for this BA's team -->
+  <div class="form-card" id="animation-card" style="display:none">
+    <h3>🎯 Animation Sale</h3>
+    <p id="animation-sub" style="font-size:12px;color:var(--muted);margin:-6px 0 12px"></p>
+
+    <div id="animation-store-wrap" style="display:none">
+      <label>Animation spot</label>
+      <select id="animation-store"></select>
+    </div>
+
+    <label>Shift</label>
+    <select id="animation-shift">
+      <option value="">Select shift</option>
+      <option value="Morning">Morning</option>
+      <option value="Afternoon">Afternoon</option>
+      <option value="Evening">Evening</option>
+    </select>
+
+    <label>Sales Amount ($)</label>
+    <input type="number" id="animation-amount" placeholder="0" min="0" step="0.01"/>
+
+    <label>Items / PCs Sold</label>
+    <input type="number" id="animation-items" placeholder="0" min="0" step="1"/>
+
+    <button class="submit-btn" id="animation-submit-btn" onclick="submitAnimationSale()">Log Animation Sale ✓</button>
   </div>
 
   <!-- Leave / Off days -->
@@ -526,7 +555,9 @@ let monthSalesCache = { key: null, rows: null };
   document.getElementById('ba-meta').textContent = profile.store ? `${profile.team} · ${profile.store}` : `${profile.team}`;
   updateBaGreeting({ hasTarget: false, pct: 0, remain: 0, goal: 0 });
 
+  await loadActiveAnimations();
   populateShopOptions();
+  renderAnimationCard();
   setDefaultDates();
   await refreshBaDashboard();
 })();
@@ -551,20 +582,40 @@ const SHOPS_BY_TEAM = {
   Hurgadah: ['Hurghada russian shop', 'Hurghada European shop'],
 };
 
-// Temporary HPP animation spot inside Terminal 3 (Cairo), running 1–10 June 2026.
-// Cairo BAs log its sales separately from regular Terminal 3. Shown through a
-// short entry buffer (13 June) then auto-hidden — remove this block afterwards.
-const HPP_CAIRO_SHOP = 'Terminal 3 — HPP (animation)';
-const HPP_VISIBLE_UNTIL = '2026-06-13';
+// Animation-spot shops are no longer hardcoded — they come from the
+// `animation_events` calendar in Supabase (see web_app/sql/add_animation_calendar.sql).
+// loadActiveAnimations() fills this with any animation events active for this BA's
+// team today (within start_date … end_date + entry buffer). Each entry is
+// { name, campaign, end_date }. The dedicated animation card uses these details.
+let activeAnimations = [];
+
+async function loadActiveAnimations() {
+  activeAnimations = [];
+  if (!currentProfile) return;
+  const team = canonicalTeamName(currentProfile.team);
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local
+  const { data, error } = await sb
+    .from('animation_events')
+    .select('name, campaign, start_date, end_date, entry_buffer_days')
+    .eq('team', team);
+  if (error || !data) return;
+  activeAnimations = data
+    .filter(ev => {
+      const end = new Date(ev.end_date + 'T00:00:00');
+      end.setDate(end.getDate() + (Number(ev.entry_buffer_days) || 0));
+      const endKey = end.toLocaleDateString('en-CA');
+      return today >= ev.start_date && today <= endKey;
+    })
+    .map(ev => ({ name: ev.name, campaign: ev.campaign, end_date: ev.end_date }));
+}
 
 function populateShopOptions() {
   const sel = document.getElementById('entry-store');
   if (!sel) return;
   const team = currentProfile ? canonicalTeamName(currentProfile.team) : '';
-  let shops = SHOPS_BY_TEAM[team] || Object.values(SHOPS_BY_TEAM).flat();
-  if (team === 'Cairo' && new Date().toLocaleDateString('en-CA') <= HPP_VISIBLE_UNTIL) {
-    shops = [...shops, HPP_CAIRO_SHOP];
-  }
+  // Regular shops only — animation spots are logged via the dedicated animation
+  // card (renderAnimationCard), not mixed into the normal shop dropdown.
+  const shops = SHOPS_BY_TEAM[team] || Object.values(SHOPS_BY_TEAM).flat();
   const prev = sel.value;
   sel.innerHTML = '<option value="">Select shop</option>' +
     shops.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -947,6 +998,114 @@ function enumerateDatesInclusive(start, end) {
 }
 
 // ── Submit a sale ─────────────────────────────────────────────────
+// Shared save: prevent duplicates for same BA + date + shop + shift —
+// update the existing row if present, otherwise insert. Returns an error or null.
+// Used by both the regular sale form and the animation card (different `store`).
+async function upsertSale({ date, store, shift, amount, items }) {
+  const { data: existingRows, error: findErr } = await sb
+    .from('sales_entries')
+    .select('id')
+    .eq('ba_id', currentUser.id)
+    .eq('entry_date', date)
+    .eq('store', store)
+    .eq('shift', shift)
+    .limit(1);
+  if (findErr) return findErr;
+
+  if (existingRows && existingRows.length) {
+    const { error: updErr } = await sb
+      .from('sales_entries')
+      .update({
+        ba_name: currentProfile.name,
+        team: currentProfile.team,
+        sales_amount: amount,
+        items_sold: items,
+        working_days: 1,
+      })
+      .eq('id', existingRows[0].id)
+      .eq('ba_id', currentUser.id);
+    return updErr || null;
+  }
+
+  const { error: insErr } = await sb.from('sales_entries').insert({
+    ba_id:        currentUser.id,
+    ba_name:      currentProfile.name,
+    team:         currentProfile.team,
+    store,
+    shift,
+    sales_amount: amount,
+    items_sold:   items,
+    working_days: 1,
+    entry_date:   date,
+  });
+  return insErr || null;
+}
+
+/** Show/hide the dedicated animation card based on which animations are active today. */
+function renderAnimationCard() {
+  const card = document.getElementById('animation-card');
+  if (!card) return;
+  const hint = document.getElementById('regular-anim-hint');
+  if (hint) hint.style.display = activeAnimations.length ? '' : 'none';
+  if (!activeAnimations.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const wrap = document.getElementById('animation-store-wrap');
+  const sel  = document.getElementById('animation-store');
+  const sub  = document.getElementById('animation-sub');
+  sel.innerHTML = activeAnimations.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+
+  if (activeAnimations.length > 1) {
+    // Rare: more than one animation live for this team at once — let the BA choose.
+    wrap.style.display = '';
+    sub.textContent = 'Log sales made at the animation spot here, separately from your regular shop. Uses the date selected above.';
+  } else {
+    wrap.style.display = 'none';
+    const a = activeAnimations[0];
+    const bits = [a.name];
+    if (a.campaign) bits.push(a.campaign);
+    bits.push('until ' + formatDate(a.end_date));
+    sub.textContent = bits.join(' · ') + '. Logs separately from your regular shop, for the date selected above.';
+  }
+}
+
+async function submitAnimationSale() {
+  const date   = document.getElementById('entry-date').value;
+  const store  = activeAnimations.length === 1
+    ? activeAnimations[0].name
+    : document.getElementById('animation-store').value;
+  const shift  = document.getElementById('animation-shift').value;
+  const amount = parseFloat(document.getElementById('animation-amount').value);
+  const items  = parseInt(document.getElementById('animation-items').value);
+
+  if (!date)   return showMsg('Please select a date (top of the page).', 'error');
+  if (!store)  return showMsg('Please select an animation spot.', 'error');
+  if (!shift)  return showMsg('Please select a shift for the animation sale.', 'error');
+  if (isNaN(amount) || amount < 0) return showMsg('Enter animation sales amount (0 or more).', 'error');
+  if (isNaN(items)  || items  < 0) return showMsg('Enter animation items count (0 or more).', 'error');
+
+  const btn = document.getElementById('animation-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const error = await upsertSale({ date, store, shift, amount, items });
+
+  btn.disabled = false;
+  btn.textContent = 'Log Animation Sale ✓';
+
+  if (error) {
+    showMsg('Error saving animation sale: ' + error.message, 'error');
+    return;
+  }
+  showMsg(amount === 0 ? '😢 Zero animation sales logged.' : '🎯 Animation sale logged!', 'success');
+  document.getElementById('animation-amount').value = '';
+  document.getElementById('animation-items').value  = '';
+  document.getElementById('animation-shift').value  = '';
+  try { await sb.rpc('link_my_legacy_rows'); } catch (_) {}
+  invalidateMonthSalesCache();
+  await refreshBaDashboard();
+}
+
 async function submitSale() {
   const amount = parseFloat(document.getElementById('sales-amount').value);
   const items  = parseInt(document.getElementById('items-sold').value);
@@ -964,46 +1123,7 @@ async function submitSale() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  // Prevent duplicates for same BA + date + shop + shift:
-  // if row exists, update it; otherwise insert new.
-  const { data: existingRows, error: findErr } = await sb
-    .from('sales_entries')
-    .select('id')
-    .eq('ba_id', currentUser.id)
-    .eq('entry_date', date)
-    .eq('store', store)
-    .eq('shift', shift)
-    .limit(1);
-
-  let error = findErr;
-  if (!error && existingRows && existingRows.length) {
-    const existingId = existingRows[0].id;
-    const { error: updErr } = await sb
-      .from('sales_entries')
-      .update({
-        ba_name: currentProfile.name,
-        team: currentProfile.team,
-        sales_amount: amount,
-        items_sold: items,
-        working_days: 1,
-      })
-      .eq('id', existingId)
-      .eq('ba_id', currentUser.id);
-    error = updErr;
-  } else if (!error) {
-    const { error: insErr } = await sb.from('sales_entries').insert({
-      ba_id:        currentUser.id,
-      ba_name:      currentProfile.name,
-      team:         currentProfile.team,
-      store,
-      shift,
-      sales_amount: amount,
-      items_sold:   items,
-      working_days: 1,
-      entry_date:   date,
-    });
-    error = insErr;
-  }
+  const error = await upsertSale({ date, store, shift, amount, items });
 
   btn.disabled = false;
   btn.textContent = 'Log Entry ✓';
