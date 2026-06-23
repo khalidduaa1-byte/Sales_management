@@ -78,14 +78,14 @@ create policy "Managers can write animation daily"
   with check (public.is_manager());
 
 -- ── Seed: the 2026 calendar (April 11–20 was cancelled, omitted) ──
--- June 1–10 keeps the legacy 'HPP' label so the pilot sales already logged in
--- sales_entries continue to match. All other 702A/700/702C/281 spots use the
--- 'Terminal N — <code> (animation)' form so the dashboard classifies the city
--- correctly and keeps them out of the regular shop totals.
+-- All spots use the 'Terminal N — <code> (animation)' form (Sharm: 'Sharm Sheikh — A
+-- (animation)') so names share one format, the dashboard classifies the city, and
+-- they stay out of the regular shop totals. The June pilot was at 702A (it was
+-- logged under an interim 'HPP' label on the live DB — see rename_june_animation_to_702a.sql).
 insert into public.animation_events (name, team, campaign, start_date, end_date, target_pcs_per_day) values
   ('Terminal 3 — 702A (animation)', 'Cairo', 'The One',       '2026-01-15', '2026-01-31', 15),
   ('Terminal 3 — 702A (animation)', 'Cairo', 'The One',       '2026-02-01', '2026-02-15', 15),
-  ('Terminal 3 — HPP (animation)',  'Cairo', 'Light Blue',    '2026-06-01', '2026-06-10', null),
+  ('Terminal 3 — 702A (animation)', 'Cairo', 'Light Blue',    '2026-06-01', '2026-06-10', null),
   ('Sharm Sheikh — A (animation)',  'Sharm', 'Light Blue',    '2026-06-21', '2026-06-30', null),
   ('Terminal 3 — 700 (animation)',  'Cairo', 'Light Blue',    '2026-07-21', '2026-07-30', null),
   ('Terminal 3 — 702C (animation)', 'Cairo', 'Light Blue',    '2026-08-01', '2026-08-10', null),

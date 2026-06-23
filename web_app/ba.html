@@ -589,6 +589,9 @@ const SHOPS_BY_TEAM = {
 // { name, campaign, end_date }. The dedicated animation card uses these details.
 let activeAnimations = [];
 
+// Clean label for display — drops the " (animation)" tag the store value carries.
+function displayAnimName(name) { return String(name || '').replace(/\s*\(animation\)\s*$/i, '').trim(); }
+
 async function loadActiveAnimations() {
   activeAnimations = [];
   if (!currentProfile) return;
@@ -1053,7 +1056,9 @@ function renderAnimationCard() {
   const wrap = document.getElementById('animation-store-wrap');
   const sel  = document.getElementById('animation-store');
   const sub  = document.getElementById('animation-sub');
-  sel.innerHTML = activeAnimations.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+  // Option text is the clean name; the value stays the full store label (with the
+  // "(animation)" tag) since that's what gets written to sales_entries.
+  sel.innerHTML = activeAnimations.map(a => `<option value="${a.name}">${displayAnimName(a.name)}</option>`).join('');
 
   if (activeAnimations.length > 1) {
     // Rare: more than one animation live for this team at once — let the BA choose.
@@ -1062,7 +1067,7 @@ function renderAnimationCard() {
   } else {
     wrap.style.display = 'none';
     const a = activeAnimations[0];
-    const bits = [a.name];
+    const bits = [displayAnimName(a.name)];
     if (a.campaign) bits.push(a.campaign);
     bits.push('until ' + formatDate(a.end_date));
     sub.textContent = bits.join(' · ') + '. Logs separately from your regular shop, for the date selected above.';

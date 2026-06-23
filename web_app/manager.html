@@ -3009,6 +3009,28 @@ function historicalAnimationRows() {
 
 function eventKey(ev) { return ev.name + '__' + ev.start_date; }
 
+// Clean label for display — drops the " (animation)" tag the store value carries
+// for detection. The underlying store strings keep the tag (don't change those).
+function displayAnimName(name) { return String(name || '').replace(/\s*\(animation\)\s*$/i, '').trim(); }
+
+// Managers can set/clear an animation's daily PCs target straight from the overview.
+async function editAnimationTarget(i) {
+  const ev = hppEventsSorted[i];
+  if (!ev) return;
+  const cur = ev.target_pcs_per_day != null ? ev.target_pcs_per_day : '';
+  const input = prompt(`Daily PCs target for "${displayAnimName(ev.name)}" (${rangeLabel(ev)}).\nLeave blank to clear.`, cur);
+  if (input === null) return; // cancelled
+  const t = String(input).trim();
+  const val = t === '' ? null : parseInt(t, 10);
+  if (t !== '' && (isNaN(val) || val < 0)) { alert('Please enter a whole number (or leave blank to clear).'); return; }
+  const { error } = await sb.from('animation_events').update({ target_pcs_per_day: val }).eq('id', ev.id);
+  if (error) { alert('Could not save target: ' + error.message); return; }
+  ev.target_pcs_per_day = val;
+  const liveEv = (animationEvents || []).find(e => e.id === ev.id);
+  if (liveEv) liveEv.target_pcs_per_day = val;
+  renderHpp();
+}
+
 function rowMatchesEvent(row, ev) {
   const d = normalizeEntryDate(row.entry_date);
   return String(row.store || '') === ev.name && d >= ev.start_date && d <= ev.end_date;
@@ -3033,7 +3055,7 @@ function populateHppFilter() {
   if (!sel) return;
   sel.innerHTML = ['<option value="">All animations</option>'].concat(
     hppEventsSorted.map(ev =>
-      `<option value="${eventKey(ev)}">${ev.campaign || 'Animation'} — ${ev.name} (${rangeLabel(ev)})</option>`)
+      `<option value="${eventKey(ev)}">${ev.campaign || 'Animation'} — ${displayAnimName(ev.name)} (${rangeLabel(ev)})</option>`)
   ).join('');
   sel.value = hppFilterKey;
 }
@@ -3055,13 +3077,14 @@ function renderHppOverview(allRows) {
     else if (today > ev.end_date)   { status = 'Done';     color = '#059669'; }
     const team = canonicalTeamName(ev.team);
     const hi = hppFilterKey === eventKey(ev) ? 'background:#eff6ff;' : '';
+    const tgt = ev.target_pcs_per_day != null ? ev.target_pcs_per_day : '—';
     return `<tr onclick="setHppFilter('${eventKey(ev) === hppFilterKey ? '' : eventKey(ev).replace(/'/g, "\\'")}')" style="cursor:pointer;${hi}">
       <td>${ev.campaign || '—'}</td>
-      <td>${ev.name}</td>
+      <td>${displayAnimName(ev.name)}</td>
       <td><span class="team-dot t${team}"></span>${team}</td>
       <td>${rangeLabel(ev)}</td>
       <td><span style="color:${color};font-weight:700">${status}</span></td>
-      <td>${ev.target_pcs_per_day != null ? ev.target_pcs_per_day : '—'}</td>
+      <td onclick="event.stopPropagation();editAnimationTarget(${i})" style="cursor:pointer;white-space:nowrap" title="Click to set the daily PCs target">${tgt} <span style="color:#9ca3af">✎</span></td>
       <td>${fmt(items)}</td>
       <td class="cell-amount">$${fmt(sales)}</td>
     </tr>`;
@@ -3100,7 +3123,7 @@ function exportHpp() {
   const list = Object.values(map).sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : (a.store < b.store ? -1 : 1)));
   if (!list.length) { alert('Nothing to export for this selection.'); return; }
   const header = ['Date', 'Spot', 'Campaign', 'Team', 'Target PCs/Day', 'Items Sold', 'Sales ($)'];
-  const body = list.map(r => [r.date, r.store, r.campaign, r.team, r.target, r.items, r.sales.toFixed(2)]);
+  const body = list.map(r => [r.date, displayAnimName(r.store), r.campaign, r.team, r.target, r.items, r.sales.toFixed(2)]);
   const csv = [header].concat(body).map(row => row.map(csvCell).join(',')).join('\r\n');
   downloadCsv(csv, 'animations_' + (hppFilterKey ? 'filtered' : 'all') + '.csv');
 }
@@ -3119,7 +3142,7 @@ function renderHpp() {
 
   const af = document.getElementById('hpp-active-filter');
   if (af) af.innerHTML = selEv
-    ? `Showing <b>${selEv.campaign || 'Animation'} — ${selEv.name}</b> (${rangeLabel(selEv)}) only. &nbsp;<a href="#" onclick="setHppFilter('');return false" style="color:#2563eb;font-weight:600">✕ Show all animations</a>`
+    ? `Showing <b>${selEv.campaign || 'Animation'} — ${displayAnimName(selEv.name)}</b> (${rangeLabel(selEv)}) only. &nbsp;<a href="#" onclick="setHppFilter('');return false" style="color:#2563eb;font-weight:600">✕ Show all animations</a>`
     : 'Showing <b>all animations</b>. Click a row in the calendar above to focus one.';
 
   const totalSales = rows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
