@@ -730,6 +730,8 @@ td.cell-amount { font-weight: 700; color: #111827; font-variant-numeric: tabular
     <button id="hpp-export-btn" onclick="exportHpp()" style="background:#111827;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">⬇ Export to Excel</button>
   </div>
 
+  <div class="hpp-section" id="hpp-active-filter" style="display:none;font-size:13px;color:#374151;background:#f3f4f6;border-radius:8px;padding:8px 12px;margin:0 0 12px"></div>
+
   <div class="kpi-grid hpp-section" style="display:none">
     <div class="kpi-card"><div class="kpi-val" id="hpp-kv-sales">—</div><div class="kpi-lbl">Total Animation Sales</div></div>
     <div class="kpi-card"><div class="kpi-val" id="hpp-kv-items">—</div><div class="kpi-lbl">Items Sold at Animations</div></div>
@@ -3114,6 +3116,11 @@ function renderHpp() {
   const selEv = hppFilterKey ? hppEventsSorted.find(ev => eventKey(ev) === hppFilterKey) : null;
   const rows = selEv ? allRows.filter(r => rowMatchesEvent(r, selEv)) : allRows;
   hppExportSource = rows;
+
+  const af = document.getElementById('hpp-active-filter');
+  if (af) af.innerHTML = selEv
+    ? `Showing <b>${selEv.campaign || 'Animation'} — ${selEv.name}</b> (${rangeLabel(selEv)}) only. &nbsp;<a href="#" onclick="setHppFilter('');return false" style="color:#2563eb;font-weight:600">✕ Show all animations</a>`
+    : 'Showing <b>all animations</b>. Click a row in the calendar above to focus one.';
 
   const totalSales = rows.reduce((s, e) => s + (Number(e.sales_amount) || 0), 0);
   const totalItems = rows.reduce((s, e) => s + (Number(e.items_sold) || 0), 0);
