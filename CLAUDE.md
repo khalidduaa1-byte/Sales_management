@@ -174,7 +174,7 @@ These look like gaps; they're decisions. Don't "fix" them without asking.
 ## Common pitfalls
 
 - **Don't run destructive SQL without confirming.** Supabase's "Run query" button is the only safety net; a bad `where` on `delete from sales_entries` wipes live data.
-- **Service worker can serve stale.** After deploys to `ba.html`, a BA who already has the PWA installed may see old code until they hard-reload or `sw.js` cache version is bumped.
+- **Views are month-scoped and default to the *current* calendar month — "missing" data at month-start is almost always this, not a data bug.** Both apps open on the current month: `ba.html` via the ‹ › switcher (`viewedMonth`, starts at `currentMonthKey()`), `manager.html` via the global Month dropdown (`buildMonthFilter` picks `cur`). The BA history list, stats, and target banner are all filtered to the viewed month (`loadHistory`, `getMyMonthSales`); the manager per-BA lists come from `monthEntries` filtered to the selected month. So on the 1st of a new month, last month's sales look gone until you switch the month — the data is fine, you're just looking at the empty new month. Diagnose "a BA isn't showing / my sale disappeared" by checking the selected month FIRST. Note the ‹ › arrows in `ba.html` are easy to miss — a BA not seeing past sales may just not know they can switch months. The log-form date field is separate: it defaults to today and is NOT bound to the viewed month (no min/max), so a BA can log a sale for any date and it stores under the date they pick.
 - **`profiles` RLS recursion** — see Invariant #4.
 - **Don't refactor `manager.html` lightly** — see Intentional non-choices.
 - **The anon key in HTML is public on purpose** — see Invariant #1.
