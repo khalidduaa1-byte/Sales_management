@@ -12,7 +12,8 @@ create table if not exists public.profiles (
   role       text not null check (role in ('manager', 'ba')),
   team       text,   -- Cairo / Sharm / Hurgadah
   store      text,   -- which store they work at
-  start_date date    -- first active day; dashboard hides the BA before this month
+  start_date date,   -- first active day; dashboard hides the BA before this month
+  end_date   date    -- last active day (left the company); dashboard hides them after this month
 );
 
 -- TABLE 2: sales_entries
@@ -71,6 +72,11 @@ alter table public.sales_entries
 -- Backfill is handled by web_app/sql/add_profiles_start_date.sql on the live DB.
 alter table public.profiles
   add column if not exists start_date date;
+
+-- Add end_date (departure) to existing databases. NULL = still with the company.
+-- Set on the live DB via web_app/sql/add_profiles_end_date.sql.
+alter table public.profiles
+  add column if not exists end_date date;
 
 -- De-duplicate exact same BA/date/store/shift rows (keep newest), then prevent future duplicates.
 -- Important: some historical imports may have ba_id = null, so we fallback to ba_name in the key.

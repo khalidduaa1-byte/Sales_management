@@ -1058,6 +1058,49 @@ function isDashboardExcludedEntry(e) {
   return isDashboardExcludedName(e.ba_name);
 }
 
+// ── Departed BAs ─────────────────────────────────────────────────
+// profiles.end_date = last active day (left the company); null = still here.
+// A departed BA keeps every sale they logged — those are real revenue and stay
+// in the team totals of the months they worked. What changes is that they stop
+// counting as an active head (targets) and stop being asked for sales after
+// their last day (Missing Sales calendar).
+
+function baEndDate(profile) {
+  return profile && profile.end_date ? normalizeEntryDate(profile.end_date) : '';
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** True once the BA's last active day has passed — i.e. not on the team today. */
+function hasBaDeparted(profile) {
+  const end = baEndDate(profile);
+  return !!end && todayIsoDate() > end;
+}
+
+/** True when the BA had already left before this month began. */
+function baLeftBeforeMonth(profile, monthKey) {
+  const end = baEndDate(profile);
+  return !!end && monthKey > end.slice(0, 7);
+}
+
+/** Display names of BAs who have left — used to label them in the BA pickers. */
+function departedBaNames() {
+  const gone = new Set();
+  allBaProfiles.forEach(p => { if (hasBaDeparted(p)) gone.add(p.name); });
+  return gone;
+}
+
+/** <option> list for BA pickers. Departed BAs stay selectable (their history is
+ *  still worth reading) but are labelled so they're not mistaken for active BAs. */
+function baOptionsMarkup(names) {
+  const gone = departedBaNames();
+  return names
+    .map(n => `<option value="${n}">${gone.has(n) ? n + ' (left)' : n}</option>`)
+    .join('');
+}
+
 /** ISO date string YYYY-MM-DD (handles DB dates and single-digit months from imports). */
 function normalizeEntryDate(d) {
   if (d == null || d === '') return '';
@@ -1253,7 +1296,14 @@ function setMainTab(tab) {
 }
 
 async function loadTeamHeadcount() {
-  const { data, error } = await sb.from('profiles').select('id, name, team, store, role, start_date').eq('role', 'ba');
+  // end_date may not exist yet on an older database; retry without it rather
+  // than leaving the whole dashboard with no BA profiles.
+  let { data, error } = await sb.from('profiles')
+    .select('id, name, team, store, role, start_date, end_date').eq('role', 'ba');
+  if (error) {
+    ({ data, error } = await sb.from('profiles')
+      .select('id, name, team, store, role, start_date').eq('role', 'ba'));
+  }
   if (error) return;
   const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
   allBaProfiles = (data || [])
@@ -1264,9 +1314,13 @@ async function loadTeamHeadcount() {
       team: canonicalTeamName(p.team),
       store: String(p.store || '').trim(),
       start_date: p.start_date || null,
+      end_date: p.end_date || null,
     }));
+  // Headcount is "who is on the team now", so it drives per_ba targets for the
+  // live month; departed BAs are dropped. Past months are unaffected because
+  // team size there falls back to the BAs who actually logged sales that month.
   allBaProfiles.forEach(p => {
-    if (counts[p.team] !== undefined) counts[p.team] += 1;
+    if (counts[p.team] !== undefined && !hasBaDeparted(p)) counts[p.team] += 1;
   });
   teamHeadcount = counts;
   rebuildBaProfileNameMap();
@@ -1400,7 +1454,7 @@ async function loadAll() {
   // Populate BA filter (registration names, not Excel roster short names)
   const names = dashboardBaNameList();
   const fba = document.getElementById('f-ba');
-  fba.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
+  fba.innerHTML = '<option value="">All BAs</option>' + baOptionsMarkup(names);
 
   rebuildStoreDropdowns();
   rebuildDailyBaDropdown();
@@ -1424,7 +1478,7 @@ function rebuildDailyBaDropdown() {
   if (!sel) return;
   const cur = sel.value;
   const names = dashboardBaNameList();
-  sel.innerHTML = '<option value="">All BAs</option>' + names.map(n => `<option>${n}</option>`).join('');
+  sel.innerHTML = '<option value="">All BAs</option>' + baOptionsMarkup(names);
   if (names.includes(cur)) sel.value = cur;
 }
 
@@ -1433,7 +1487,7 @@ function rebuildProfileBaDropdown() {
   if (!sel) return;
   const cur = sel.value;
   const names = dashboardBaNameList();
-  sel.innerHTML = '<option value="">Select BA</option>' + names.map(n => `<option>${n}</option>`).join('');
+  sel.innerHTML = '<option value="">Select BA</option>' + baOptionsMarkup(names);
   if (names.includes(cur)) sel.value = cur;
 }
 
@@ -2603,6 +2657,9 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
     // Hide a BA from months before they joined (start_date). Profiles synthesized
     // from this month's own entries have no start_date and are never skipped.
     if (profile.start_date && monthKey < String(profile.start_date).slice(0, 7)) return;
+    // Same in the other direction: someone who left the company is not missing
+    // sales in the months after their last day.
+    if (baLeftBeforeMonth(profile, monthKey)) return;
     if (teamFilter && profile.team !== teamFilter) return;
     if (!baPassesShopFilter(profile, cityFilter, monthKey)) return;
 
@@ -2628,11 +2685,16 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
       attByDate.set(normalizeEntryDate(e.entry_date), e.status || 'off_day');
     });
 
+    const endDate = baEndDate(profile);
     const cells = dates.map(date => {
       // Days before the BA joined are not "missing" — treat as neutral (covers a
       // mid-month start, e.g. someone who joined on the 15th).
       if (profile.start_date && date < normalizeEntryDate(profile.start_date)) {
         return { date, status: 'future', label: 'Before BA joined' };
+      }
+      // Likewise for days after they left (covers a mid-month departure).
+      if (endDate && date > endDate) {
+        return { date, status: 'future', label: 'After BA left the company' };
       }
       if (isCurrent && date > checkEnd) {
         return { date, status: 'future', label: 'Upcoming — not due yet' };
