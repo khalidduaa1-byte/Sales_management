@@ -1588,7 +1588,16 @@ function renderKPIs(entries) {
   // view (All Teams + All BAs + All cities). Any filter, or no flag, shows
   // the real distinct-BA count. Safe to leave in place; delete when done.
   const DEMO_ACTIVE_BAS = 25;
-  const demoOn = new URLSearchParams(location.search).get('demo') === '1';
+  // Sticky for this browser tab, because logging in at index.html redirects to
+  // manager.html without a query string and would otherwise drop the flag.
+  // ?demo=1 switches it on, ?demo=0 switches it off again.
+  const demoParam = new URLSearchParams(location.search).get('demo');
+  let demoOn = demoParam === '1';
+  try {
+    if (demoParam === '1') sessionStorage.setItem('demoActiveBas', '1');
+    else if (demoParam === '0') sessionStorage.removeItem('demoActiveBas');
+    demoOn = demoOn || sessionStorage.getItem('demoActiveBas') === '1';
+  } catch (e) { /* private mode / storage blocked — fall back to the URL flag */ }
   const noFilter = id => !((document.getElementById(id) || {}).value);
   const demoUnfiltered = noFilter('f-team') && noFilter('f-ba') && noFilter('global-store');
   setText('kv5', (demoOn && demoUnfiltered) ? DEMO_ACTIVE_BAS : bas.size);
