@@ -1342,7 +1342,22 @@ function proratePerBaTarget(baseTarget, monthKey, leaveDays) {
 
 // ── Load all entries ─────────────────────────────────────────────
 async function loadAll() {
-  const { data, error } = await fetchAllTableRows('sales_entries', 'entry_date', false);
+  // These four tables are independent of one another, so fetch them
+  // concurrently rather than one after the next. Previously each awaited the
+  // one before it, which on shop mobile data meant four serial round-trip
+  // chains before the first KPI could render. Processing order below is
+  // unchanged.
+  const [
+    { data, error },
+    { data: animData, error: animError },
+    { data: animEvData, error: animEvError },
+    { data: attendanceData, error: attendanceError },
+  ] = await Promise.all([
+    fetchAllTableRows('sales_entries', 'entry_date', false),
+    fetchAllTableRows('animation_daily', 'entry_date', false),
+    fetchAllTableRows('animation_events', 'start_date', true),
+    fetchAllTableRows('ba_attendance_entries', 'entry_date', false),
+  ]);
   if (error) {
     console.error(error);
     allEntries = [];
@@ -1366,7 +1381,6 @@ async function loadAll() {
 
   // Historical animation actuals — loaded separately and shown ONLY in the
   // Animations tab. Deliberately NOT merged into allEntries (would double-count).
-  const { data: animData, error: animError } = await fetchAllTableRows('animation_daily', 'entry_date', false);
   if (animError) {
     animationDaily = [];
     console.warn('animation_daily not available:', animError.message);
@@ -1374,7 +1388,6 @@ async function loadAll() {
     animationDaily = animData || [];
   }
 
-  const { data: animEvData, error: animEvError } = await fetchAllTableRows('animation_events', 'start_date', true);
   if (animEvError) {
     animationEvents = [];
     console.warn('animation_events not available:', animEvError.message);
@@ -1382,7 +1395,6 @@ async function loadAll() {
     animationEvents = animEvData || [];
   }
 
-  const { data: attendanceData, error: attendanceError } = await fetchAllTableRows('ba_attendance_entries', 'entry_date', false);
   if (attendanceError) {
     attendanceEntries = [];
     console.warn('ba_attendance_entries not available:', attendanceError.message);
