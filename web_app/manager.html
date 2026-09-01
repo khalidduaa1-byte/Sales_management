@@ -1253,7 +1253,11 @@ function setMainTab(tab) {
 }
 
 async function loadTeamHeadcount() {
-  const { data, error } = await sb.from('profiles').select('id, name, team, store, role, start_date').eq('role', 'ba');
+  // select('*') rather than a column list: end_date is only present once the
+  // add_profiles_end_date_for_leavers.sql migration has run, and naming a
+  // column that does not exist yet would error and blank the dashboard.
+  // profiles is ~20 rows, so the extra columns cost nothing.
+  const { data, error } = await sb.from('profiles').select('*').eq('role', 'ba');
   if (error) return;
   const counts = { Cairo: 0, Sharm: 0, Hurgadah: 0 };
   allBaProfiles = (data || [])
@@ -1264,6 +1268,7 @@ async function loadTeamHeadcount() {
       team: canonicalTeamName(p.team),
       store: String(p.store || '').trim(),
       start_date: p.start_date || null,
+      end_date: p.end_date || null,
     }));
   allBaProfiles.forEach(p => {
     if (counts[p.team] !== undefined) counts[p.team] += 1;
@@ -2633,6 +2638,8 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
     // Hide a BA from months before they joined (start_date). Profiles synthesized
     // from this month's own entries have no start_date and are never skipped.
     if (profile.start_date && monthKey < String(profile.start_date).slice(0, 7)) return;
+    // Likewise hide them from months after they left (end_date).
+    if (profile.end_date && monthKey > String(profile.end_date).slice(0, 7)) return;
     if (teamFilter && profile.team !== teamFilter) return;
     if (!baPassesShopFilter(profile, cityFilter, monthKey)) return;
 
@@ -2663,6 +2670,11 @@ function buildMissingSubmissionModel(monthKey, teamFilter, cityFilter) {
       // mid-month start, e.g. someone who joined on the 15th).
       if (profile.start_date && date < normalizeEntryDate(profile.start_date)) {
         return { date, status: 'future', label: 'Before BA joined' };
+      }
+      // Days after the BA left are not "missing" either (covers a mid-month
+      // leave date, e.g. someone whose last day was the 12th).
+      if (profile.end_date && date > normalizeEntryDate(profile.end_date)) {
+        return { date, status: 'future', label: 'After BA left' };
       }
       if (isCurrent && date > checkEnd) {
         return { date, status: 'future', label: 'Upcoming — not due yet' };

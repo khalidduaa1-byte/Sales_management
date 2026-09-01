@@ -12,7 +12,8 @@ create table if not exists public.profiles (
   role       text not null check (role in ('manager', 'ba')),
   team       text,   -- Cairo / Sharm / Hurgadah
   store      text,   -- which store they work at
-  start_date date    -- first active day; dashboard hides the BA before this month
+  start_date date,   -- first active day; dashboard hides the BA before this month
+  end_date   date    -- last active day; dashboard stops expecting submissions after it (null = still active)
 );
 
 -- TABLE 2: sales_entries
