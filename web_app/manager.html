@@ -1583,7 +1583,15 @@ function renderKPIs(entries) {
   setText('kv2', totalPcs.toLocaleString());
   setText('kv3', avgPcsPerDay);
   setText('kv4', top ? `${top[0]} (${top[1].toFixed(1)})` : '—');
-  setText('kv5', bas.size);
+  // ── DEMO OVERRIDE — for video recording only, NOT for production ──
+  // Active only with ?demo=1 in the URL, and only on the fully unfiltered
+  // view (All Teams + All BAs + All cities). Any filter, or no flag, shows
+  // the real distinct-BA count. Safe to leave in place; delete when done.
+  const DEMO_ACTIVE_BAS = 25;
+  const demoOn = new URLSearchParams(location.search).get('demo') === '1';
+  const noFilter = id => !((document.getElementById(id) || {}).value);
+  const demoUnfiltered = noFilter('f-team') && noFilter('f-ba') && noFilter('global-store');
+  setText('kv5', (demoOn && demoUnfiltered) ? DEMO_ACTIVE_BAS : bas.size);
 }
 
 // ── Team targets ─────────────────────────────────────────────────
